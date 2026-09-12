@@ -248,22 +248,28 @@ db.close()
         self.assertEqual(unconfirmed.exception.status_code, 403)
 
     def test_illegal_llm_stage_transition_returns_fallback(self):
+        # "intent" (pedir aclaracion) es un destino valido desde cualquier
+        # estado -- lo que la maquina de estados SI bloquea es saltar
+        # directo a "confirmation" sin haber pasado antes por una pantalla
+        # con datos reales (generated/interaction).
         self.db.add(SessionState(
             user_id=self.user_id,
-            current_stage="generated",
+            current_stage="idle",
             last_screen_id="vigente",
             last_screen_payload={"id": "vigente", "components": []},
         ))
         self.db.commit()
-        clarification = {
-            "id": "intencion-invalida",
-            "question": "¿Que necesitas?",
-            "stage_label": "Intencion",
+        confirmation_screen = {
+            "id": "confirmacion-invalida",
+            "title": "Confirma",
+            "stage_kind": "confirmation",
+            "stage_label": "Confirmacion",
+            "components": [{"id": "summary", "component": "ConfirmationSummary"}],
         }
         with patch(
             "app.llm.orchestrator.get_client",
             return_value=_FakeClient([
-                _response(_tool_call("ui-invalid", "emit_clarification", clarification))
+                _response(_tool_call("ui-invalid", "emit_screen", confirmation_screen))
             ]),
         ):
             response = run_turn(

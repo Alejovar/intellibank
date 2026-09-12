@@ -27,11 +27,19 @@ MAX_TOOL_ITERATIONS = 6
 ALLOWED_STAGE_TRANSITIONS = {
     "idle": {"intent", "generated"},
     "intent": {"intent", "generated"},
-    "generated": {"generated", "interaction", "confirmation", "result"},
-    "interaction": {"interaction", "confirmation", "result"},
-    "confirmation": {"interaction", "result"},
+    "generated": {"intent", "generated", "interaction", "confirmation", "result"},
+    "interaction": {"intent", "interaction", "confirmation", "result"},
+    "confirmation": {"intent", "interaction", "result"},
     "result": {"intent", "generated"},
 }
+# "intent" (pedir una aclaracion) es un destino valido desde CUALQUIER estado:
+# preguntar es siempre una accion segura y reversible, y las peticiones reales
+# de un usuario casi nunca siguen un guion lineal de un solo intent -> generated
+# -> ... -> result (p.ej. tras mostrar una pantalla, el modelo puede necesitar
+# un dato adicional para continuar). Lo que la maquina de estados SI protege
+# -- y lo unico que le importa a la seguridad -- es que nunca se salte
+# "confirmation" antes de una accion irreversible; eso vive en la validacion
+# de POST /actions/execute (ver routers/actions.py), no en esta tabla.
 
 
 def _history(db: Session, user_id: int) -> list[dict]:
