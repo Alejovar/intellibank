@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import A2UIRenderer from "../components/A2UIRenderer";
 import BottomNav from "../components/BottomNav";
+import ChatInput from "../components/ChatInput";
 import { Brand, StatusBar } from "../components/PhoneChrome";
 
 const TINTS = ["#FBE9ED", "#EEF3FC", "#EAF6EE", "#FDF0E3"];
 
-export default function SavedScreensScreen({ onNavigate }) {
+export default function SavedScreensScreen({ onNavigate, onStartAssistant }) {
   const [screens, setScreens] = useState([]);
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +62,10 @@ export default function SavedScreensScreen({ onNavigate }) {
           </>
         )}
       </main>
-      <BottomNav activeTab="saved" onChange={onNavigate} />
+      <ChatInput
+        onSend={(message) => onStartAssistant(message)}
+        navigation={<BottomNav activeTab="saved" onChange={onNavigate} />}
+      />
     </div>
   );
 }

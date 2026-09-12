@@ -37,9 +37,9 @@ export default function App() {
   else if (page === "home") {
     screen = <HomeScreen onNavigate={setPage} onStartAssistant={openAssistant} />;
   } else if (page === "saved") {
-    screen = <SavedScreensScreen onNavigate={setPage} />;
+    screen = <SavedScreensScreen onNavigate={setPage} onStartAssistant={openAssistant} />;
   } else if (page === "more") {
-    screen = <MoreScreen onNavigate={setPage} onChangeCategories={changeCategories} />;
+    screen = <MoreScreen onNavigate={setPage} onChangeCategories={changeCategories} onStartAssistant={openAssistant} />;
   } else if (!categoryPicked) {
     screen = <CategorySelection onNavigate={setPage} onContinue={(msg) => {
       setInitialMessage(msg || null);

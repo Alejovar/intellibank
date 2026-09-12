@@ -1,8 +1,9 @@
 import BottomNav from "../components/BottomNav";
+import ChatInput from "../components/ChatInput";
 import { Brand, StatusBar } from "../components/PhoneChrome";
 import { useAppStore } from "../store/useAppStore";
 
-export default function MoreScreen({ onNavigate, onChangeCategories }) {
+export default function MoreScreen({ onNavigate, onChangeCategories, onStartAssistant }) {
   const fullName = useAppStore((s) => s.fullName);
   const activeCategories = useAppStore((s) => s.activeCategories);
   const logout = useAppStore((s) => s.logout);
@@ -25,7 +26,10 @@ export default function MoreScreen({ onNavigate, onChangeCategories }) {
         </section>
         <button className="btn btn-ghost more-logout" onClick={logout}>Cerrar sesión</button>
       </main>
-      <BottomNav activeTab="more" onChange={onNavigate} />
+      <ChatInput
+        onSend={(message) => onStartAssistant(message)}
+        navigation={<BottomNav activeTab="more" onChange={onNavigate} />}
+      />
     </div>
   );
 }

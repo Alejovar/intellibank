@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import BottomNav from "../components/BottomNav";
+import ChatInput from "../components/ChatInput";
 import { Brand, StatusBar } from "../components/PhoneChrome";
 import { useAppStore } from "../store/useAppStore";
 
@@ -80,7 +81,10 @@ export default function HomeScreen({ onNavigate, onStartAssistant }) {
           </div>
         </section>
       </main>
-      <BottomNav activeTab="home" onChange={onNavigate} />
+      <ChatInput
+        onSend={(message) => onStartAssistant(message)}
+        navigation={<BottomNav activeTab="home" onChange={onNavigate} />}
+      />
     </div>
   );
 }
