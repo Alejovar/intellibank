@@ -1,0 +1,412 @@
+/*
+  Liquid Glass — paleta minimalista: rojo (acento), blancos/grises (base),
+  beige (fondo cálido). Las superficies son translúcidas (backdrop-filter)
+  para que se sientan como capas de vidrio flotando sobre el fondo, con un
+  realce especular sutil en el borde superior (como Apple's Liquid Glass).
+*/
+:root {
+  --red-700: #b3122a;
+  --red-600: #d81e35;
+  --red-500: #eb0029;
+  --red-100: #fde8ea;
+
+  --ink-900: #23201e;
+  --ink-700: #4a4442;
+  --ink-500: #837c78;
+  --ink-300: #b8b0aa;
+
+  --beige-100: #f5efe5;
+  --beige-200: #eee5d6;
+  --beige-300: #e4d8c4;
+
+  --glass-fill: rgba(255, 255, 255, 0.55);
+  --glass-fill-strong: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-border-soft: rgba(255, 255, 255, 0.45);
+  --glass-shadow: 0 10px 34px rgba(75, 30, 20, 0.10), 0 1px 2px rgba(75, 30, 20, 0.06);
+
+  --radius-xl: 26px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+
+  --ok-600: #1a8a4c;
+
+  font-family: -apple-system, "SF Pro Text", "Inter", BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body, #root { height: 100%; margin: 0; }
+
+body {
+  color: var(--ink-900);
+  background: var(--beige-100);
+}
+
+/* Fondo con "manchas" de color desenfocadas: le dan al vidrio algo que
+   refractar. Puramente decorativo, position fixed detras de todo. */
+.app-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--beige-100) 0%, var(--beige-200) 100%);
+}
+.app-backdrop::before,
+.app-backdrop::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+}
+.app-backdrop::before {
+  width: 420px; height: 420px;
+  top: -140px; right: -120px;
+  background: radial-gradient(circle, rgba(235,0,41,0.28), rgba(235,0,41,0) 70%);
+}
+.app-backdrop::after {
+  width: 380px; height: 380px;
+  bottom: -160px; left: -100px;
+  background: radial-gradient(circle, rgba(184,176,170,0.35), rgba(184,176,170,0) 70%);
+}
+
+.phone-shell {
+  position: relative;
+  z-index: 1;
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass-fill);
+  backdrop-filter: blur(34px) saturate(160%);
+  -webkit-backdrop-filter: blur(34px) saturate(160%);
+  border-left: 1px solid var(--glass-border-soft);
+  border-right: 1px solid var(--glass-border-soft);
+  box-shadow: var(--glass-shadow);
+}
+
+/* Barra superior: vidrio con un tinte rojo muy sutil, no un bloque solido */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: linear-gradient(180deg, rgba(235,0,41,0.10), rgba(235,0,41,0.03));
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-bottom: 1px solid rgba(235,0,41,0.10);
+  color: var(--ink-900);
+  padding: 16px 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.app-header::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+}
+.app-header .brand {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.1px;
+  color: var(--ink-900);
+}
+.app-header .tagline {
+  font-size: 11.5px;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
+.app-header .back-btn {
+  background: var(--glass-fill-strong);
+  border: 1px solid var(--glass-border);
+  color: var(--ink-700);
+  width: 34px;
+  height: 34px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 15px;
+  backdrop-filter: blur(10px);
+}
+
+.screen-body {
+  position: relative;
+  flex: 1;
+  padding: 16px 16px 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+/* Superficie de vidrio base para tarjetas/paneles */
+.card {
+  position: relative;
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 6px 20px rgba(75,30,20,0.06);
+}
+
+.card-title {
+  font-size: 15px;
+  font-weight: 650;
+  margin: 0 0 4px;
+  color: var(--ink-900);
+}
+
+.card-subtitle {
+  font-size: 12.5px;
+  color: var(--ink-500);
+  margin: 0 0 10px;
+}
+
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 13px 18px;
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+.btn:active { transform: scale(0.98); }
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--red-500), var(--red-600));
+  color: white;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.35) inset, 0 6px 16px rgba(235,0,41,0.28);
+}
+.btn-secondary {
+  background: var(--glass-fill-strong);
+  color: var(--ink-900);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--red-600);
+}
+.btn-danger {
+  background: linear-gradient(180deg, #c23a34, #a32a24);
+  color: white;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.chat-bubble {
+  max-width: 82%;
+  padding: 11px 15px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.42;
+}
+.chat-bubble.assistant {
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--glass-border);
+  align-self: flex-start;
+  border-bottom-left-radius: 6px;
+  color: var(--ink-900);
+}
+.chat-bubble.user {
+  background: linear-gradient(180deg, var(--red-500), var(--red-600));
+  color: white;
+  align-self: flex-end;
+  border-bottom-right-radius: 6px;
+}
+
+/* Barra de entrada: pastilla flotante de vidrio, separada del contenido */
+.input-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 0 14px 14px;
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 8px 8px 8px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  box-shadow: 0 10px 28px rgba(75,30,20,0.14), 0 1px 0 rgba(255,255,255,0.7) inset;
+}
+
+.input-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 10px 0;
+  font-size: 14px;
+  outline: none;
+  color: var(--ink-900);
+}
+.input-bar input::placeholder { color: var(--ink-500); }
+
+.icon-btn {
+  border: none;
+  background: rgba(0,0,0,0.04);
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ink-700);
+  flex-shrink: 0;
+}
+.icon-btn.send { background: linear-gradient(180deg, var(--red-500), var(--red-600)); color: white; }
+.icon-btn.mic-active { background: linear-gradient(180deg, var(--red-500), var(--red-600)); color: white; }
+
+.option-row {
+  border: 1.5px solid rgba(0,0,0,0.06);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  margin-bottom: 8px;
+  background: rgba(255,255,255,0.5);
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.option-row.highlighted {
+  border-color: var(--red-500);
+  background: var(--red-100);
+}
+.option-row .radio {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid var(--ink-300); flex-shrink: 0;
+}
+.option-row.highlighted .radio {
+  border-color: var(--red-500);
+  background: radial-gradient(circle, var(--red-500) 40%, transparent 44%);
+}
+
+.badge {
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.05);
+  color: var(--ink-700);
+}
+
+.category-chip {
+  border: 1.5px solid rgba(0,0,0,0.08);
+  border-radius: 999px;
+  padding: 9px 15px;
+  font-size: 13px;
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  color: var(--ink-900);
+}
+.category-chip.selected {
+  background: linear-gradient(180deg, var(--red-500), var(--red-600));
+  border-color: transparent;
+  color: white;
+}
+
+.progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.progress-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, var(--red-500), var(--red-600));
+}
+
+.info-banner {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: rgba(0,0,0,0.035);
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-700);
+}
+.info-banner.warning { background: #fbecd8; color: #7a4a12; }
+.info-banner.tip { background: #e7f3ea; color: #1f5e39; }
+
+.bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0 14px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  background: var(--glass-fill-strong);
+  backdrop-filter: blur(18px);
+}
+.bottom-nav .nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 10.5px;
+  color: var(--ink-500);
+}
+.bottom-nav .nav-item.active { color: var(--red-500); font-weight: 600; }
+
+/* ---------------- Máquina de estados / listón de progreso ---------------- */
+.flow-trace {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+  scrollbar-width: none;
+}
+.flow-trace::-webkit-scrollbar { display: none; }
+
+.flow-step {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.flow-step .dot-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.flow-step .dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.15);
+  border: 2px solid transparent;
+}
+.flow-step.active .dot {
+  background: var(--red-500);
+  box-shadow: 0 0 0 4px rgba(235,0,41,0.15);
+}
+.flow-step.done .dot { background: var(--ink-300); }
+.flow-step .label {
+  font-size: 10px;
+  color: var(--ink-500);
+  white-space: nowrap;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.flow-step.active .label { color: var(--red-600); font-weight: 700; }
+.flow-step .connector {
+  width: 22px;
+  height: 1.5px;
+  background: rgba(0,0,0,0.12);
+  margin: 0 2px 16px;
+  flex-shrink: 0;
+}
