@@ -4,9 +4,13 @@ from sqlalchemy.orm import Session
 from .. import auth as auth_module
 from ..database import get_db
 from ..llm.tools import (
+    calculate_performance,
     get_balance,
     get_credit_status,
     get_expenses_summary,
+    get_investment_products,
+    get_investment_profile,
+    get_portfolio,
     get_movements,
 )
 
@@ -27,3 +31,25 @@ def home_summary(
         "recentMovements": get_movements(db, user.id, limit=4),
         "expensesSummary": get_expenses_summary(db, user.id),
     }
+
+
+@router.get("/investment-summary")
+def investment_summary(
+    db: Session = Depends(get_db),
+    user=Depends(auth_module.get_current_user),
+):
+    """Datos deterministas para el shell fijo del modulo de inversiones."""
+    return {
+        "user": {"fullName": user.full_name},
+        "portfolio": get_portfolio(db, user.id),
+        "performance": calculate_performance(db, user.id),
+        "profile": get_investment_profile(db, user.id),
+    }
+
+
+@router.get("/investment-products")
+def investment_products(
+    db: Session = Depends(get_db),
+    user=Depends(auth_module.get_current_user),
+):
+    return get_investment_products(db, user.id)

@@ -12,10 +12,13 @@ export const useAppStore = create((set, get) => ({
   token: localStorage.getItem("banorte_token") || null,
   fullName: localStorage.getItem("banorte_name") || "",
   onboardingDone: localStorage.getItem("banorte_onboarding") === "1",
+  biometricEnabled: localStorage.getItem("banorte_biometric") === "1",
+  activeModule: "investments",
 
   activeCategories: [],
   thread: [], // [{kind:"chat", role, text} | {kind:"screen", envelope}]
   currentScreen: null, // la ultima A2UIScreen/Clarification mostrada a pantalla completa
+  currentEnvelope: null,
   loading: false,
   error: null,
 
@@ -26,16 +29,21 @@ export const useAppStore = create((set, get) => ({
   // depende de cuantos pasos haya necesitado ese pedido en particular.
   flowTrace: [], // [{ stageKind, stageLabel, threadIndex }]
 
-  login: (token, fullName, onboardingDone) => {
+  login: (token, fullName, onboardingDone, biometricEnabled = false) => {
     localStorage.setItem("banorte_token", token);
     localStorage.setItem("banorte_name", fullName);
     localStorage.setItem("banorte_onboarding", onboardingDone ? "1" : "0");
-    set({ token, fullName, onboardingDone });
+    localStorage.setItem("banorte_biometric", biometricEnabled ? "1" : "0");
+    if (biometricEnabled) localStorage.setItem("intellibank_biometric_ready", "1");
+    set({ token, fullName, onboardingDone, biometricEnabled, activeModule: "investments" });
   },
 
   logout: () => {
-    localStorage.clear();
-    set({ token: null, fullName: "", onboardingDone: false, thread: [], currentScreen: null });
+    localStorage.removeItem("banorte_token");
+    localStorage.removeItem("banorte_name");
+    localStorage.removeItem("banorte_onboarding");
+    localStorage.removeItem("banorte_biometric");
+    set({ token: null, fullName: "", onboardingDone: false, biometricEnabled: false, thread: [], currentScreen: null, currentEnvelope: null, flowTrace: [] });
   },
 
   completeOnboarding: () => {
@@ -54,6 +62,11 @@ export const useAppStore = create((set, get) => ({
 
   setLoading: (v) => set({ loading: v }),
   setError: (e) => set({ error: e }),
+  setBiometricEnabled: (enabled) => {
+    localStorage.setItem("banorte_biometric", enabled ? "1" : "0");
+    if (enabled) localStorage.setItem("intellibank_biometric_ready", "1");
+    set({ biometricEnabled: enabled });
+  },
 
   pushChat: (role, text) =>
     set((s) => ({ thread: [...s.thread, { kind: "chat", role, text }] })),
@@ -77,14 +90,14 @@ export const useAppStore = create((set, get) => ({
         const flowTrace = startsNewFlow
           ? [{ stageKind, stageLabel, threadIndex }]
           : [...s.flowTrace, { stageKind, stageLabel, threadIndex }];
-        return { thread, currentScreen: payload, flowTrace };
+        return { thread, currentScreen: payload, currentEnvelope: response, flowTrace };
       });
     } else if (response.mime_type === "text/plain") {
       get().pushChat("assistant", response.payload);
     }
   },
 
-  clearCurrentScreen: () => set({ currentScreen: null }),
+  clearCurrentScreen: () => set({ currentScreen: null, currentEnvelope: null }),
 
-  resetThread: () => set({ thread: [], currentScreen: null, flowTrace: [] }),
+  resetThread: () => set({ thread: [], currentScreen: null, currentEnvelope: null, flowTrace: [] }),
 }));

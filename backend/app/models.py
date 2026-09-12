@@ -4,7 +4,8 @@ del hackathon: no representan cuentas ni clientes reales de Banorte.
 """
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, JSON
+    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, JSON,
+    LargeBinary,
 )
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -16,6 +17,12 @@ class User(Base):
     clave_bancaria = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=True)
+    phone = Column(String, nullable=True)
+    card_number_hash = Column(String, unique=True, index=True, nullable=True)
+    card_last4 = Column(String, nullable=True)
+    biometric_enabled = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     onboarding_done = Column(Boolean, default=False)
 
     accounts = relationship("Account", back_populates="owner")
@@ -95,11 +102,51 @@ class Investment(Base):
     __tablename__ = "investments"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    product_id = Column(String, nullable=True)
     product = Column(String)
     amount = Column(Float)
+    current_value = Column(Float, nullable=True)
     term_months = Column(Integer)
     estimated_rate = Column(Float)
     status = Column(String, default="simulado")  # simulado | activo
+    opened_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class InvestmentTransaction(Base):
+    """Movimientos de dinero asociados a una posición de inversión."""
+    __tablename__ = "investment_transactions"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    investment_id = Column(Integer, ForeignKey("investments.id"), nullable=True)
+    transaction_type = Column(String, nullable=False)  # deposit | withdrawal | gain | fee
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    occurred_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class InvestmentProduct(Base):
+    """Catalogo de productos que el agente puede recomendar."""
+    __tablename__ = "investment_products"
+    id = Column(String, primary_key=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    risk_level = Column(String, nullable=False)
+    annual_rate = Column(Float, nullable=False)
+    min_amount = Column(Float, default=0.0)
+    active = Column(Boolean, default=True, nullable=False)
+
+
+class PortfolioSnapshot(Base):
+    """Foto historica del portafolio para comparaciones antes/despues."""
+    __tablename__ = "portfolio_snapshots"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    total_invested = Column(Float, nullable=False, default=0.0)
+    total_value = Column(Float, nullable=False, default=0.0)
+    total_gain = Column(Float, nullable=False, default=0.0)
+    positions = Column(JSON, default=list)
+    captured_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 class InsurancePolicy(Base):
@@ -154,6 +201,36 @@ class SavedScreen(Base):
     owner = relationship("User", back_populates="generated_screens")
 
 
+class InterfaceHistory(Base):
+    """Registro reproducible de cada interfaz generada por una pregunta."""
+    __tablename__ = "interface_history"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    title = Column(String, nullable=False)
+    user_prompt = Column(Text, nullable=True)
+    intent = Column(String, nullable=True)
+    tool_names = Column(JSON, default=list)
+    tool_args = Column(JSON, default=dict)
+    data_snapshot = Column(JSON, default=dict)
+    a2ui_payload = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class AuthDevice(Base):
+    """Metadata de un dispositivo; nunca guarda huellas ni rostros."""
+    __tablename__ = "auth_devices"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    platform = Column(String, nullable=False)  # ios | android | web
+    credential_id = Column(String, nullable=False, unique=True)
+    credential_public_key = Column(LargeBinary, nullable=True)
+    sign_count = Column(Integer, default=0, nullable=False)
+    transports = Column(JSON, default=list)
+    device_name = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
+
+
 class ConversationTurn(Base):
     """Historial de conversacion por usuario, usado para dar contexto al LLM."""
     __tablename__ = "conversation_turns"
@@ -168,6 +245,11 @@ class SessionState(Base):
     """Estado autoritativo del flujo A2UI activo para un usuario."""
     __tablename__ = "session_states"
     user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    active_module = Column(String, default="investments", nullable=False)
+    flow_id = Column(String, nullable=True)
+    active_intent = Column(String, nullable=True)
+    current_state = Column(String, default="READY", nullable=False)
+    context_json = Column(JSON, default=dict)
     current_stage = Column(String, default="idle")
     last_screen_id = Column(String, nullable=True)
     last_screen_payload = Column(JSON, nullable=True)

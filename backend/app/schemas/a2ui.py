@@ -34,6 +34,15 @@ COMPONENT_CATALOG = {
     "SuccessScreen",
     "InfoBanner",
     "TextBlock",
+    "PortfolioSummaryCard",
+    "InvestmentPositionCard",
+    "PortfolioTable",
+    "PerformanceChart",
+    "CashflowTable",
+    "InvestmentComparison",
+    "InvestmentProductList",
+    "RiskProfileSelector",
+    "BeforeAfterPortfolio",
 }
 
 

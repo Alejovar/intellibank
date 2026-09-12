@@ -22,8 +22,38 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  login: (clave_bancaria, password) =>
-    request("/auth/login", { method: "POST", body: JSON.stringify({ clave_bancaria, password }) }),
+  login: (identifier, password) =>
+    request("/auth/login", { method: "POST", body: JSON.stringify({ identifier, password }) }),
+
+  register: (data) =>
+    request("/auth/register", { method: "POST", body: JSON.stringify(data) }),
+
+  enrollBiometric: (platform, credentialId, deviceName) =>
+    request("/auth/biometric/enroll", {
+      method: "POST",
+      body: JSON.stringify({ platform, credential_id: credentialId, device_name: deviceName }),
+    }),
+
+  getPasskeyRegistrationOptions: () =>
+    request("/auth/passkey/register/options", { method: "POST" }),
+
+  completePasskeyRegistration: (credential, platform = "web", deviceName = null) =>
+    request("/auth/passkey/register/complete", {
+      method: "POST",
+      body: JSON.stringify({ credential, platform, device_name: deviceName }),
+    }),
+
+  getPasskeyLoginOptions: (identifier) =>
+    request("/auth/passkey/login/options", {
+      method: "POST",
+      body: JSON.stringify({ identifier }),
+    }),
+
+  completePasskeyLogin: (identifier, credential) =>
+    request("/auth/passkey/login/complete", {
+      method: "POST",
+      body: JSON.stringify({ identifier, credential }),
+    }),
 
   completeOnboarding: () => request("/auth/onboarding-complete", { method: "POST" }),
 
@@ -38,6 +68,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ message, input_mode: inputMode, active_categories: activeCategories }),
     }),
+
+  transcribeAudio: (blob, filename = "dictado.webm") => {
+    const form = new FormData();
+    form.append("audio", blob, filename);
+    const token = localStorage.getItem("banorte_token");
+    return fetch(`${BASE}/voice/transcribe`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || `Error ${res.status}`);
+      return body;
+    });
+  },
 
   /**
    * Unico canal por el que una interaccion con un componente generado
@@ -59,4 +104,9 @@ export const api = {
   listSavedScreens: () => request("/actions/saved-screens"),
 
   getHomeSummary: () => request("/accounts/home-summary"),
+
+  getInvestmentSummary: () => request("/accounts/investment-summary"),
+  getInvestmentProducts: () => request("/accounts/investment-products"),
+  listInvestmentHistory: () => request("/investments/history"),
+  replayInvestmentHistory: (id) => request(`/investments/history/${id}/replay`, { method: "POST" }),
 };

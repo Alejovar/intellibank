@@ -1,19 +1,48 @@
 import { useRef, useState } from "react";
+import { api } from "../api/client";
 
 /**
- * Input siempre disponible debajo de la pantalla: texto + microfono.
- * Usa la Web Speech API cuando esta disponible (Chrome/Edge); si no,
- * cae de forma silenciosa a solo-texto (el boton de mic se deshabilita).
+ * Compositor persistente del shell: texto, dictado y envio. Usa la API
+ * de voz nativa cuando existe y recurre a la transcripcion del backend.
  */
 export default function ChatInput({ onSend, disabled, navigation }) {
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const canRecordAudio = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 
-  const startListening = () => {
-    if (!SpeechRecognition) return;
+  const startListening = async () => {
+    if (!SpeechRecognition && !canRecordAudio) return;
+    if (listening) {
+      recognitionRef.current?.stop?.();
+      recorderRef.current?.stop?.();
+      return;
+    }
+    if (!SpeechRecognition) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        chunksRef.current = [];
+        recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((track) => track.stop());
+          setListening(false);
+          try {
+            const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+            const result = await api.transcribeAudio(blob);
+            if (result.text) onSend(result.text, "voice");
+          } catch { /* El usuario puede volver a intentar; no interrumpimos el chat. */ }
+        };
+        recorder.start();
+        recorderRef.current = recorder;
+        setListening(true);
+      } catch { setListening(false); }
+      return;
+    }
     const recognition = new SpeechRecognition();
     recognition.lang = "es-MX";
     recognition.interimResults = false;
@@ -42,22 +71,25 @@ export default function ChatInput({ onSend, disabled, navigation }) {
         </div>
       )}
       <div className="composer-row">
-        <button
-          className={`icon-btn ${listening ? "mic-active" : ""}`}
-          onClick={startListening}
-          disabled={disabled || !SpeechRecognition}
-          title={SpeechRecognition ? "Hablar" : "Voz no soportada en este navegador"}
-        >
-          <span className="mic-glyph" />
-        </button>
         <input
-          placeholder="Cuéntame lo que necesitas…"
+          placeholder="Habla con tu asistente…"
           value={text}
           disabled={disabled}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
         />
-        <button className="icon-btn send" onClick={submit} disabled={disabled} aria-label="Enviar">▶</button>
+        <button
+          className={`icon-btn mic ${listening ? "mic-active" : ""}`}
+          onClick={startListening}
+          disabled={disabled || (!SpeechRecognition && !canRecordAudio)}
+          title={SpeechRecognition || canRecordAudio ? "Dictado rápido" : "Voz no soportada en este navegador"}
+          aria-label={listening ? "Detener dictado" : "Iniciar dictado rápido"}
+        >
+          <span className="mic-glyph" />
+        </button>
+        <button className="icon-btn send" onClick={submit} disabled={disabled || !text.trim()} aria-label="Enviar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 4 17 8-17 8 3.2-7H14v-2H7.2L4 4Z" /></svg>
+        </button>
       </div>
       {navigation}
     </div>

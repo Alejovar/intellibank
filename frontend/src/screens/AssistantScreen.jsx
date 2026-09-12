@@ -7,12 +7,13 @@ import FlowTrace from "../components/FlowTrace";
 import { Brand, StatusBar } from "../components/PhoneChrome";
 import BottomNav from "../components/BottomNav";
 
-export default function AssistantScreen({ initialMessage, onInitialMessageConsumed, onNavigate, onChangeCategories }) {
+export default function AssistantScreen({ initialMessage, onInitialMessageConsumed, onNavigate }) {
   const thread = useAppStore((s) => s.thread);
   const flowTrace = useAppStore((s) => s.flowTrace);
   const pushChat = useAppStore((s) => s.pushChat);
   const applyResponse = useAppStore((s) => s.applyResponse);
   const activeCategories = useAppStore((s) => s.activeCategories);
+  const fullName = useAppStore((s) => s.fullName);
   const loading = useAppStore((s) => s.loading);
   const setLoading = useAppStore((s) => s.setLoading);
   const error = useAppStore((s) => s.error);
@@ -75,10 +76,9 @@ export default function AssistantScreen({ initialMessage, onInitialMessageConsum
         <button className="back-btn" onClick={onChangeCategories} title="Cambiar temas" aria-label="Cambiar temas">‹</button>
         <div>
           <Brand compact />
-          <div className="tagline">Pantalla generada</div>
+          <div className="tagline">Asistente de inversiones</div>
         </div>
         <span className="a2ui-pill" style={{ marginLeft: "auto" }}>A2UI</span>
-        <button className="topic-btn" onClick={onChangeCategories}>Temas</button>
       </div>
 
       {flowTrace.length >= 2 && (
@@ -91,7 +91,7 @@ export default function AssistantScreen({ initialMessage, onInitialMessageConsum
         {thread.length === 0 && !loading && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <span className="eyebrow" style={{ color: "var(--ink-600)", background: "#F2ECED" }}>Pantalla fija</span>
-            <h1 className="screen-title">Hola Daniela,<br />¿en qué te puedo ayudar hoy?</h1>
+            <h1 className="screen-title">Hola {(fullName || "Cliente").split(" ")[0]},<br />¿qué quieres explorar?</h1>
             <div className="card" style={{ background: "var(--red-050)" }}>
               <div className="card-title">Adapta tu interfaz</div>
               <div className="card-subtitle" style={{ marginBottom: 0 }}>Dime qué necesitas y armaré la pantalla adecuada.</div>

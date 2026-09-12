@@ -1,8 +1,8 @@
-# Banorte AI — App bancaria con UI generativa (A2UI)
+# IntelliBank — Inversiones con UI generativa (A2UI)
 
-Hackathon Banorte x Tec de Monterrey. Backend FastAPI + orquestacion de LLM
+Prototipo del modulo de inversiones. Backend FastAPI + orquestacion de LLM
 que emite interfaces via el protocolo **A2UI**, y frontend React + Vite que
-resuelve ese JSON contra un catalogo cerrado de componentes.
+resuelve ese JSON contra un catalogo cerrado de componentes de inversiones.
 
 ## Maquina de estados del flujo
 
@@ -50,57 +50,39 @@ lenguaje visual Liquid Glass de Apple, minimalista y con la paleta pedida:
   y chips de categoria; radios grandes (20-26px) en tarjetas, concéntricos
   con su contenedor, como pide el lenguaje Liquid Glass.
 
-Como el catalogo de componentes ya trabaja con clases CSS globales (`.card`,
-`.btn`, etc.) en vez de estilos embebidos, este cambio de diseño no toco la
-logica de ningun componente — solo `theme.css`, `App.jsx` (fondo) y los dos
-archivos nuevos de la maquina de estados.
+El renderer mantiene el catalogo cerrado como frontera de seguridad: el agente
+solo puede pedir componentes registrados y el cliente nunca ejecuta codigo
+recibido desde el modelo.
 
-## Que hay implementado
+## Alcance actual: inversiones
 
-- **Protocolo A2UI de punta a punta**: el LLM nunca genera JSX/HTML. Emite
-  JSON estructurado a traves de function-calling de OpenAI (`emit_screen` /
-  `emit_clarification`), el backend lo valida con Pydantic contra un catalogo
-  cerrado de 11 componentes, y solo entonces se manda al cliente envuelto
-  como `{ mime_type: "application/a2ui+json", payload: {...} }`. El frontend
-  jamas intenta parsear texto libre.
-- **Loop de tools de dominio**: 26 funciones Python deterministas (saldo,
-  movimientos, reestructura de credito, amortizacion, inversiones, limites de
-  gasto, pagos programados, gastos compartidos) que el LLM llama para obtener
-  datos reales antes de decidir que UI mostrar. El LLM elige la tool mediante
-  function-calling nativo de OpenAI, pero su ejecucion cruza un cliente/servidor
-  MCP real por stdio y ocurre en un proceso separado contra SQLite. Nunca
-  inventa cifras. Las tools `emit_screen` / `emit_clarification` permanecen
-  locales porque son el protocolo de emision de UI de la app.
-- **Acciones = tool calls reales**: un click en un boton/slider/opcion de una
-  pantalla generada llega a `POST /actions/execute`, se ejecuta por la misma
-  ruta MCP contra SQLite, y el resultado se reinyecta a la conversacion para
-  que el LLM decida el siguiente paso (nunca es un mensaje de chat nuevo).
-- **Los 3 flujos de las imagenes de referencia**, funcionando de extremo a
-  extremo con datos sinteticos:
-  1. **Credito inteligente**: intencion ambigua ("quiero pagar menos
-     intereses") -> clarificacion -> opciones de reestructura -> slider de
-     plazo/pago con grafica -> confirmacion con biometria simulada -> accion
-     real aplicada -> pantalla de exito.
-  2. **Inversiones personalizadas**: perfilamiento por opciones -> productos
-     sugeridos segun perfil y monto -> simulador con curva de crecimiento ->
-     confirmar inversion -> resultado guardado.
-  3. **Control de gastos y pagos**: resumen de gastos por categoria (donut +
-     insight) -> crear limite inteligente -> pago de tarjeta (minimo vs
-     recomendado por IA) -> pago programado -> confirmacion.
-  4. Caso abierto adicional ya soportado por las tools: **dividir la cuenta
-     de un bar entre amigos**, con una interfaz editable (`SharedExpenseList`)
-     donde se pueden seguir agregando gastos y personas despues.
-- **Guia activa cuando la idea es ambigua o "imposible"**: el system prompt
-  (`backend/app/llm/system_prompt.py`) instruye al modelo a **nunca saltar**
-  de una peticion abierta directo a una pantalla — primero pregunta lo minimo
-  necesario (`emit_clarification`, idealmente con opciones), y antes de
-  cualquier accion irreversible siempre pasa por una `ConfirmationSummary`
-  con `requires_biometric`. Asi, un pedido como "reduce lo que pago de
-  credito" se va desglosando pantalla por pantalla en vez de fallar.
-- Login con clave bancaria + password, onboarding de 4 pantallas fijas,
-  seleccion de categoria con **revelacion progresiva** (no se muestran todos
-  los subtemas de una vez), input de texto + voz (Web Speech API) siempre
-  visible, y guardar/descartar al cerrar cualquier pantalla generada.
+- **Shell único**: saldo y rendimiento arriba, superficie A2UI reemplazable al
+  centro y compositor de IA persistente sobre una navegación simétrica de tres
+  destinos: Historial, Inicio y Perfil.
+- **Acceso progresivo**: la primera entrada solicita nombre, correo, teléfono,
+  contraseña y CLABE o tarjeta dentro de una sola interfaz. En visitas
+  posteriores muestra directamente biometría o el acceso alternativo por
+  contraseña, sin pestañas de registro/login.
+- **Biometría real para la demo web**: WebAuthn/passkeys solicita el autenticador
+  de plataforma (Face ID, huella o Windows Hello), verifica la firma en FastAPI
+  y guarda únicamente clave pública, contador e identificador de credencial.
+
+- **LLM + MCP + A2UI**: el agente descubre exclusivamente tools de inversiones.
+  El LLM interpreta la intención y elige herramientas; MCP ejecuta lógica
+  determinista; A2UI describe la pantalla y React la renderiza.
+- **Portafolio**: consulta de posiciones, valor total, rendimiento,
+  aportaciones, retiros y comparación de productos.
+- **Flujo de inversión**: perfil de riesgo -> productos -> simulación ->
+  confirmación con `requires_biometric` -> inversión registrada.
+- **Historial reproducible**: cada pantalla generada guarda prompt, intención,
+  tools, argumentos, datos y payload A2UI. Al abrirla se reproduce sin llamar
+  nuevamente al LLM y se compara el antes contra el estado actual.
+- **Registro**: nombre, correo, teléfono, contraseña y CLABE o tarjeta. Las
+  cuentas nuevas usan hash PBKDF2; la tarjeta se guarda solo como hash y últimos
+  cuatro dígitos.
+- **Voz**: el navegador usa reconocimiento nativo cuando está disponible y
+  el backend ofrece `/voice/transcribe` como fallback con
+  `gpt-4o-mini-transcribe`.
 
 ## Estructura
 
@@ -109,9 +91,10 @@ backend/
   app/
     main.py                 FastAPI app, CORS, seed al iniciar
     mcp_server.py           Servidor MCP stdio; ejecuta tools de dominio contra SQLite
-    models.py                SQLAlchemy (datos 100% sinteticos)
-    seed.py                   Carga datos demo si la DB esta vacia
-    auth.py                    Login simple (clave + password) -> token
+    models.py                SQLAlchemy (usuarios, inversiones, snapshots, historial)
+    seed.py                  Carga datos demo y catalogo de productos
+    auth.py                  Registro/login y sesiones firmadas
+    passkeys.py              Registro y autenticación WebAuthn/passkeys
     schemas/
       a2ui.py                  *** Esquema del protocolo A2UI (Pydantic) ***
       chat.py                   Requests/responses de chat y acciones
@@ -124,17 +107,18 @@ backend/
       mcp_client.py             Cliente MCP persistente (thread + subprocess stdio)
       orchestrator.py          *** Loop de tool-use + validacion A2UI ***
     routers/
-      auth.py, chat.py, actions.py
+      auth.py, chat.py, actions.py, investments.py, voice.py
 
 frontend/
   src/
+    auth/passkeys.js         Adaptador WebAuthn del navegador
     components/
-      catalog/                *** Los 11 componentes del catalogo cerrado ***
+      catalog/                *** Componentes genericos + catalogo de inversiones ***
       A2UIRenderer.jsx          Resuelve el JSON del backend contra el catalogo
+      InvestmentShell.jsx       Saldo/superficie/dock persistentes
       ChatInput.jsx             Texto + microfono, siempre visible
     screens/
-      LoginScreen, OnboardingScreen (fijo), CategorySelection (progresivo),
-      AssistantScreen (chat + pantallas generadas + guardar/descartar)
+      LoginScreen, HomeScreen, SavedScreensScreen, MoreScreen
     store/useAppStore.js        Estado global (zustand)
     api/client.js               Cliente HTTP
 ```
@@ -143,13 +127,13 @@ frontend/
 
 ### Backend
 
-```bash
+```powershell
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# edita .env y agrega tu OPENAI_API_KEY
-uvicorn app.main:app --reload --port 8000
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+# Si backend/.env no existe, créalo con OPENAI_API_KEY y OPENAI_MODEL=gpt-4o-mini
+python -m uvicorn app.main:app --reload --port 8001
 ```
 
 La DB SQLite (`banorte_demo.db`) se crea y se llena sola con un usuario demo
@@ -160,24 +144,26 @@ en el primer arranque:
 
 ### Frontend
 
-```bash
+```powershell
 cd frontend
 npm install
 npm run dev
 ```
 
-Abre `http://localhost:5173`. El `vite.config.js` ya tiene un proxy de
-`/api` -> `http://localhost:8000`, asi que no hay que configurar CORS a mano
+Abre `http://localhost:5173` (usa `localhost`, no la IP, para que WebAuthn
+coincida con el RP ID configurado). El `vite.config.js` ya tiene un proxy de
+`/api` -> `http://127.0.0.1:8001`, asi que no hay que configurar CORS a mano
 en desarrollo (aunque el backend tambien trae CORS habilitado por si se sirve
 por separado).
 
 ## Notas sobre el LLM
 
 - El modelo usado es configurable via `OPENAI_MODEL` en `.env` (por defecto `gpt-4o-mini`).
-- Cada usuario tiene un historial de conversacion en memoria (ver
-  `_CONVERSATIONS` en `orchestrator.py`). Para produccion, migrar ese
-  historial a la tabla `ConversationTurn` que ya esta en `models.py`, o a
-  Redis, para que sobreviva reinicios y escale a mas de un proceso.
+- GPT-4o Mini se usa para texto, function calling y salidas estructuradas. El
+  dictado puede usar el reconocimiento del dispositivo o el fallback
+  `OPENAI_TRANSCRIPTION_MODEL=gpt-4o-mini-transcribe`.
+- Las conversaciones viven en `ConversationTurn` y las interfaces en
+  `InterfaceHistory`; el login ya no borra el historial.
 - El orquestador limita a `MAX_TOOL_ITERATIONS = 6` llamadas de tool por
   turno para evitar loops infinitos; si el modelo no logra emitir una
   pantalla valida en ese margen, se degrada a un mensaje de texto plano
@@ -203,8 +189,14 @@ por separado).
 
 - Datos 100% sinteticos/hardcodeados (sin conexion a sistemas reales de
   Banorte), como pide el stack del hackathon.
-- Autenticacion simplificada (token en memoria, no JWT firmado) — suficiente
-  para demo, no para produccion.
-- El historial de conversacion vive en memoria del proceso backend.
-- La "biometria" en `ConfirmationSummary` es solo visual (no integra un
-  sensor real); el boton dispara el tool real directamente.
+- El token de la demo se firma con `JWT_SECRET` y expira en 24 horas. Para
+  producción se deben usar access/refresh tokens, rotación, revocación y un
+  proveedor de identidad bancario.
+- Los retos WebAuthn viven cinco minutos en memoria. En producción deben vivir
+  en Redis u otro almacén compartido; las credenciales públicas sí persisten en
+  la base de datos. La biometría nunca se guarda ni se envía al servidor.
+- La misma API y contrato A2UI están listos para un cliente React Native. En
+  iOS/Android el renderer será nativo y utilizará la passkey/biometría de la
+  plataforma; este repositorio conserva la web como demo ejecutable del flujo.
+- SQLite y tasas sintéticas son adecuados para presentar el flujo, no para
+  operar inversiones reales.

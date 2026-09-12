@@ -16,7 +16,8 @@ from sqlalchemy.orm import Session
 from ..models import (
     Account, Movement, CreditAccount, ExpenseLimit, ScheduledPayment,
     InvestmentProfile, Investment, InsurancePolicy, InsuranceClaim,
-    FinancialGoal, SharedExpenseGroup,
+    FinancialGoal, InvestmentProduct, InvestmentTransaction,
+    PortfolioSnapshot, SharedExpenseGroup,
 )
 
 
@@ -125,18 +126,211 @@ _INVESTMENT_PRODUCTS = {
 }
 
 
+def get_investment_profile(db: Session, user_id: int) -> dict:
+    profile = (
+        db.query(InvestmentProfile)
+        .filter(InvestmentProfile.user_id == user_id)
+        .first()
+    )
+    return {"riskProfile": profile.risk_profile if profile else None}
+
+
+def get_investment_products(
+    db: Session, user_id: int, risk_profile: str | None = None
+) -> dict:
+    """Lista el catalogo de productos sin que el LLM invente tasas."""
+    profile = risk_profile or get_investment_profile(db, user_id).get("riskProfile")
+    products = db.query(InvestmentProduct).filter(InvestmentProduct.active.is_(True)).all()
+    if products:
+        rows = [
+            {
+                "id": product.id,
+                "title": product.title,
+                "description": product.description,
+                "risk": product.risk_level,
+                "rate": product.annual_rate,
+                "minAmount": product.min_amount,
+            }
+            for product in products
+        ]
+    else:
+        rows = [product for group in _INVESTMENT_PRODUCTS.values() for product in group]
+    if profile in _INVESTMENT_PRODUCTS:
+        allowed = {product["id"] for product in _INVESTMENT_PRODUCTS[profile]}
+        rows = [product for product in rows if product["id"] in allowed]
+    return {"riskProfile": profile, "products": rows}
+
+
+def _portfolio_rows(db: Session, user_id: int) -> list[dict]:
+    positions = (
+        db.query(Investment)
+        .filter(Investment.user_id == user_id, Investment.status == "activo")
+        .order_by(Investment.opened_at, Investment.id)
+        .all()
+    )
+    rows = []
+    for position in positions:
+        invested = round(position.amount or 0.0, 2)
+        current = round(position.current_value if position.current_value is not None else invested, 2)
+        gain = round(current - invested, 2)
+        rows.append({
+            "id": position.id,
+            "productId": position.product_id,
+            "product": position.product,
+            "amount": invested,
+            "currentValue": current,
+            "gain": gain,
+            "gainPct": round((gain / invested) * 100, 2) if invested else 0.0,
+            "termMonths": position.term_months,
+            "rate": position.estimated_rate,
+            "status": position.status,
+            "openedAt": position.opened_at.isoformat() if position.opened_at else None,
+        })
+    return rows
+
+
+def _capture_portfolio_snapshot(db: Session, user_id: int) -> PortfolioSnapshot:
+    rows = _portfolio_rows(db, user_id)
+    total_invested = round(sum(row["amount"] for row in rows), 2)
+    total_value = round(sum(row["currentValue"] for row in rows), 2)
+    snapshot = PortfolioSnapshot(
+        user_id=user_id,
+        total_invested=total_invested,
+        total_value=total_value,
+        total_gain=round(total_value - total_invested, 2),
+        positions=rows,
+    )
+    db.add(snapshot)
+    return snapshot
+
+
+def get_portfolio(db: Session, user_id: int) -> dict:
+    """Resumen y posiciones actuales del portafolio del usuario."""
+    rows = _portfolio_rows(db, user_id)
+    total_invested = round(sum(row["amount"] for row in rows), 2)
+    total_value = round(sum(row["currentValue"] for row in rows), 2)
+    total_gain = round(total_value - total_invested, 2)
+    return {
+        "totalInvested": total_invested,
+        "totalValue": total_value,
+        "totalGain": total_gain,
+        "gainPct": round((total_gain / total_invested) * 100, 2) if total_invested else 0.0,
+        "positions": rows,
+        "isEmpty": not rows,
+    }
+
+
+def get_investment_cashflows(
+    db: Session, user_id: int, limit: int = 20
+) -> dict:
+    """Devuelve ingresos, aportaciones, retiros y cargos del portafolio."""
+    transactions = (
+        db.query(InvestmentTransaction)
+        .filter(InvestmentTransaction.user_id == user_id)
+        .order_by(InvestmentTransaction.occurred_at.desc(), InvestmentTransaction.id.desc())
+        .limit(max(1, min(limit, 100)))
+        .all()
+    )
+    rows = [
+        {
+            "id": row.id,
+            "type": row.transaction_type,
+            "amount": round(row.amount, 2),
+            "description": row.description or row.transaction_type.title(),
+            "date": row.occurred_at.isoformat() if row.occurred_at else None,
+        }
+        for row in transactions
+    ]
+    return {
+        "transactions": rows,
+        "totalDeposits": round(sum(row["amount"] for row in rows if row["type"] == "deposit"), 2),
+        "totalWithdrawals": round(sum(abs(row["amount"]) for row in rows if row["type"] == "withdrawal"), 2),
+        "totalGains": round(sum(row["amount"] for row in rows if row["type"] == "gain"), 2),
+    }
+
+
+def calculate_performance(db: Session, user_id: int) -> dict:
+    """Calcula rendimiento agregado y por posicion de forma determinista."""
+    portfolio = get_portfolio(db, user_id)
+    points = []
+    for row in portfolio["positions"]:
+        points.append({
+            "label": row["product"],
+            "value": row["gain"],
+            "returnPct": row["gainPct"],
+        })
+    return {
+        "totalInvested": portfolio["totalInvested"],
+        "currentValue": portfolio["totalValue"],
+        "totalGain": portfolio["totalGain"],
+        "returnPct": portfolio["gainPct"],
+        "byPosition": points,
+        "trend": "positive" if portfolio["totalGain"] >= 0 else "negative",
+    }
+
+
+def compare_investments(
+    db: Session,
+    user_id: int,
+    product_ids: list[str],
+    amount: float,
+    term_months: int,
+) -> dict:
+    """Compara productos con el mismo monto y plazo, sin ejecutar una inversion."""
+    all_products = {p["id"]: p for group in _INVESTMENT_PRODUCTS.values() for p in group}
+    catalog_products = db.query(InvestmentProduct).filter(InvestmentProduct.active.is_(True)).all()
+    if catalog_products:
+        all_products.update({
+            p.id: {"id": p.id, "title": p.title, "rate": p.annual_rate, "risk": p.risk_level}
+            for p in catalog_products
+        })
+    selected = []
+    for product_id in product_ids[:4]:
+        product = all_products.get(product_id)
+        if not product:
+            continue
+        monthly_rate = product["rate"] / 100 / 12
+        final_value = round(amount * ((1 + monthly_rate) ** term_months), 2)
+        selected.append({
+            "productId": product_id,
+            "title": product["title"],
+            "risk": product["risk"],
+            "rate": product["rate"],
+            "amount": amount,
+            "termMonths": term_months,
+            "finalValue": final_value,
+            "estimatedGain": round(final_value - amount, 2),
+        })
+    return {"amount": amount, "termMonths": term_months, "products": selected}
+
+
 def get_investment_options(db: Session, user_id: int, amount: float,
                             risk_profile: str = "conservador") -> dict:
-    products = _INVESTMENT_PRODUCTS.get(risk_profile, _INVESTMENT_PRODUCTS["conservador"])
-    return {"amount": amount, "riskProfile": risk_profile, "products": products}
+    return {
+        "amount": amount,
+        **get_investment_products(db, user_id, risk_profile),
+    }
 
 
 def simulate_investment(db: Session, user_id: int, product_id: str, amount: float,
                          term_months: int) -> dict:
     all_products = {p["id"]: p for lst in _INVESTMENT_PRODUCTS.values() for p in lst}
+    catalog_product = (
+        db.query(InvestmentProduct)
+        .filter(InvestmentProduct.id == product_id, InvestmentProduct.active.is_(True))
+        .first()
+    )
+    if catalog_product:
+        all_products[product_id] = {
+            "id": catalog_product.id,
+            "title": catalog_product.title,
+            "rate": catalog_product.annual_rate,
+        }
     product = all_products.get(product_id)
     if not product:
         return {"error": "producto no encontrado"}
+    if amount <= 0 or term_months <= 0 or term_months > 120:
+        return {"error": "monto o plazo invalido"}
     rate = product["rate"]
     monthly_rate = rate / 100 / 12
     curve = []
@@ -154,13 +348,52 @@ def simulate_investment(db: Session, user_id: int, product_id: str, amount: floa
 
 def confirm_investment(db: Session, user_id: int, product_id: str, product_title: str,
                         amount: float, term_months: int, rate: float) -> dict:
+    all_products = {p["id"]: p for group in _INVESTMENT_PRODUCTS.values() for p in group}
+    catalog_product = (
+        db.query(InvestmentProduct)
+        .filter(InvestmentProduct.id == product_id, InvestmentProduct.active.is_(True))
+        .first()
+    )
+    if catalog_product:
+        all_products[product_id] = {
+            "id": catalog_product.id,
+            "title": catalog_product.title,
+            "rate": catalog_product.annual_rate,
+        }
+    product = all_products.get(product_id)
+    if not product:
+        return {"error": "producto no encontrado"}
+    if amount <= 0 or term_months <= 0:
+        return {"error": "monto o plazo invalido"}
     inv = Investment(
-        user_id=user_id, product=product_title, amount=amount,
-        term_months=term_months, estimated_rate=rate, status="activo",
+        user_id=user_id,
+        product_id=product_id,
+        product=product["title"],
+        amount=amount,
+        current_value=amount,
+        term_months=term_months,
+        estimated_rate=product["rate"],
+        status="activo",
     )
     db.add(inv)
+    db.flush()
+    db.add(InvestmentTransaction(
+        user_id=user_id,
+        investment_id=inv.id,
+        transaction_type="deposit",
+        amount=amount,
+        description=f"Aportacion inicial a {product['title']}",
+    ))
+    _capture_portfolio_snapshot(db, user_id)
     db.commit()
-    return {"confirmed": True, "investmentId": inv.id}
+    return {
+        "confirmed": True,
+        "investmentId": inv.id,
+        "productId": product_id,
+        "productTitle": product["title"],
+        "amount": amount,
+        "termMonths": term_months,
+    }
 
 
 # ---------------------------------------------------------------- seguros
@@ -546,6 +779,12 @@ TOOL_REGISTRY = {
     "simulate_plan_payment": simulate_plan_payment,
     "apply_credit_plan": apply_credit_plan,
     "set_investment_profile": set_investment_profile,
+    "get_investment_profile": get_investment_profile,
+    "get_investment_products": get_investment_products,
+    "get_portfolio": get_portfolio,
+    "get_investment_cashflows": get_investment_cashflows,
+    "calculate_performance": calculate_performance,
+    "compare_investments": compare_investments,
     "get_investment_options": get_investment_options,
     "simulate_investment": simulate_investment,
     "confirm_investment": confirm_investment,

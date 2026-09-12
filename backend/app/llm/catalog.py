@@ -60,11 +60,50 @@ CATALOGO CERRADO DE COMPONENTES (usa EXACTAMENTE estos nombres en "component"):
     Uso: sugerencias, alertas ("gastaste 18% mas de lo usual"), disclaimers.
 
 11. TextBlock
-    props: { text }
-    Uso: texto simple cuando ningun otro componente aplica (usar con moderacion).
+     props: { text }
+     Uso: texto simple cuando ningun otro componente aplica (usar con moderacion).
+
+12. PortfolioSummaryCard
+    props: { totalInvested, totalValue, totalGain, gainPct, asOf? }
+    Uso: resumen principal del portafolio de inversiones.
+
+13. InvestmentPositionCard
+    props: { product, amount, currentValue, gain, gainPct, risk?, status? }
+    Uso: mostrar una posicion individual con sus metricas.
+
+14. PortfolioTable
+    props: { columns?: [string], rows: [{ product, amount, currentValue, gain, gainPct }] }
+    Uso: tabla detallada de posiciones del portafolio.
+
+15. PerformanceChart
+    props: { data: [{ label, value }], totalGain, returnPct, period? }
+    Uso: grafica de rendimiento actual o historico.
+
+16. CashflowTable
+    props: { transactions: [{ date, type, description, amount }], totalDeposits?,
+            totalWithdrawals?, totalGains? }
+    Uso: ingresos, egresos, aportaciones y retiros del portafolio.
+
+17. InvestmentComparison
+    props: { products: [{ title, risk, rate, amount, termMonths, finalValue, estimatedGain }] }
+    Uso: comparar alternativas de inversion.
+
+18. InvestmentProductList
+    props: { products: [{ id, title, description?, risk, rate, minAmount }] }
+    actions: seleccionar un producto para simular.
+    Uso: productos disponibles segun perfil y monto.
+
+19. RiskProfileSelector
+    props: { currentProfile?, options: [{ id, title, description }] }
+    actions: guardar un perfil de riesgo.
+    Uso: perfilamiento de inversion.
+
+20. BeforeAfterPortfolio
+    props: { before: { totalValue, totalGain, capturedAt }, after: { totalValue, totalGain, capturedAt } }
+    Uso: comparar una interfaz historica contra los datos actuales.
 
 REGLAS DE COMPOSICION:
-- Una pantalla (A2UIScreen) puede combinar 1 a 4 componentes en layout "stack" (vertical)
+- Una pantalla (A2UIScreen) puede combinar 1 a 5 componentes en layout "stack" (vertical)
   o "grid".
 - Si la peticion del usuario es ambigua o muy abierta (ej. "quiero pagar menos intereses"),
   NO generes una pantalla todavia: responde con A2UIClarification y una pregunta puntual,
@@ -72,8 +111,12 @@ REGLAS DE COMPOSICION:
 - Guia al usuario paso a paso: primero entiende la intencion, luego muestra opciones,
   luego permite ajustar (slider/formulario), luego confirma, luego resultado. No hagas
   saltos bruscos de "pregunta" a "confirmacion" sin pasar por una pantalla de opciones/ajuste.
-- Los datos financieros reales (saldos, movimientos, tasas) SIEMPRE deben venir de los
-  resultados de tools que ya llamaste. Nunca inventes cifras.
+ - Los datos financieros reales (saldos, movimientos, tasas) SIEMPRE deben venir de los
+   resultados de tools que ya llamaste. Nunca inventes cifras.
+ - Para una misma intencion puedes cambiar la presentacion: "muestrame mis inversiones"
+   y "muestramelo en tabla" pueden usar get_portfolio, pero con componentes diferentes.
+ - Las tasas y productos del catalogo deben venir de get_investment_products o
+   get_investment_options; el LLM no puede inventarlos.
 - saveable=false SOLO para pantallas de saldo/resumen fijo que el sistema ya definio como
   no editables (ej. BalanceCard principal mostrado solo).
 """

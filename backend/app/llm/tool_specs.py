@@ -108,6 +108,57 @@ DOMAIN_TOOLS = [
         },
     },
     {
+        "name": "get_investment_profile",
+        "description": "Obtiene el perfil de riesgo actual del usuario.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_investment_products",
+        "description": "Lista productos de inversion activos y sus tasas definidas por el catalogo financiero.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "risk_profile": {
+                    "type": "string",
+                    "enum": ["conservador", "moderado", "dinamico"],
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_portfolio",
+        "description": "Obtiene el portafolio actual, valor total, aportaciones, ganancias y posiciones.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_investment_cashflows",
+        "description": "Lista aportaciones, retiros, ganancias y cargos del portafolio.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "default": 20}},
+            "required": [],
+        },
+    },
+    {
+        "name": "calculate_performance",
+        "description": "Calcula rendimiento total y por posicion del portafolio.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "compare_investments",
+        "description": "Compara hasta cuatro productos de inversion para un monto y plazo dados.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "product_ids": {"type": "array", "items": {"type": "string"}, "minItems": 2},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+                "term_months": {"type": "integer", "exclusiveMinimum": 0},
+            },
+            "required": ["product_ids", "amount", "term_months"],
+        },
+    },
+    {
         "name": "get_insurance_products",
         "description": "Regresa productos sinteticos de seguro disponibles con prima, cobertura y deducible.",
         "input_schema": {"type": "object", "properties": {}, "required": []},
@@ -303,6 +354,9 @@ _COMPONENT_SCHEMA = {
                 "BalanceCard", "MovementsTable", "ExpenseChart", "OptionsList",
                 "PaymentSlider", "TransferForm", "SharedExpenseList",
                 "ConfirmationSummary", "SuccessScreen", "InfoBanner", "TextBlock",
+                "PortfolioSummaryCard", "InvestmentPositionCard", "PortfolioTable",
+                "PerformanceChart", "CashflowTable", "InvestmentComparison",
+                "InvestmentProductList", "RiskProfileSelector", "BeforeAfterPortfolio",
             ],
         },
         "props": {"type": "object"},
@@ -369,6 +423,24 @@ UI_TOOLS = [
 
 ALL_TOOLS = DOMAIN_TOOLS + UI_TOOLS
 
+# El codigo legacy de otros modulos se conserva para no romper datos de la
+# demo anterior, pero el agente de esta fase solo descubre tools de inversiones.
+INVESTMENT_DOMAIN_TOOL_NAMES = {
+    "set_investment_profile",
+    "get_investment_profile",
+    "get_investment_products",
+    "get_investment_options",
+    "get_portfolio",
+    "get_investment_cashflows",
+    "calculate_performance",
+    "compare_investments",
+    "simulate_investment",
+    "confirm_investment",
+}
+INVESTMENT_DOMAIN_TOOLS = [
+    tool for tool in DOMAIN_TOOLS if tool["name"] in INVESTMENT_DOMAIN_TOOL_NAMES
+]
+
 
 def _to_openai_tool(spec: dict) -> dict:
     return {
@@ -381,4 +453,4 @@ def _to_openai_tool(spec: dict) -> dict:
     }
 
 
-OPENAI_TOOLS = [_to_openai_tool(t) for t in ALL_TOOLS]
+OPENAI_TOOLS = [_to_openai_tool(t) for t in INVESTMENT_DOMAIN_TOOLS + UI_TOOLS]

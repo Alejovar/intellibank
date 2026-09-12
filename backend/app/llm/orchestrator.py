@@ -9,6 +9,7 @@ Este es el unico lugar del backend que "habla" con el LLM.
 from __future__ import annotations
 import json
 import logging
+from uuid import uuid4
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
@@ -16,13 +17,14 @@ from .client import get_client, get_model
 from . import mcp_client
 from .system_prompt import build_system_prompt
 from .tool_specs import OPENAI_TOOLS
-from ..models import ConversationTurn, SessionState
+from ..models import ConversationTurn, InterfaceHistory, SessionState
 from ..schemas.a2ui import A2UIScreen, A2UIClarification, A2UIEnvelope
 from ..schemas.chat import ChatTextResponse
 
 logger = logging.getLogger("banorte.orchestrator")
 
 MAX_TOOL_ITERATIONS = 6
+MAX_HISTORY_MESSAGES = 24
 
 ALLOWED_STAGE_TRANSITIONS = {
     "idle": {"intent", "generated"},
@@ -33,15 +35,82 @@ ALLOWED_STAGE_TRANSITIONS = {
     "result": {"intent", "generated"},
 }
 
+STAGE_TO_STATE = {
+    "intent": "UNDERSTANDING_INTENT",
+    "generated": "GENERATED_VIEW",
+    "interaction": "INTERACTION",
+    "confirmation": "CONFIRMATION",
+    "result": "COMPLETED",
+}
+
+
+def _history_intent(tool_names: list[str], stage_label: str) -> str:
+    intent_by_tool = {
+        "get_portfolio": "view_portfolio",
+        "get_investment_cashflows": "view_cashflows",
+        "calculate_performance": "view_performance",
+        "compare_investments": "compare_investments",
+        "simulate_investment": "simulate_investment",
+        "confirm_investment": "confirm_investment",
+        "set_investment_profile": "set_investment_profile",
+    }
+    for name in tool_names:
+        if name in intent_by_tool:
+            return intent_by_tool[name]
+    return (stage_label or "investment_view").strip().lower().replace(" ", "_")
+
+
+def _record_interface_history(
+    db: Session,
+    user_id: int,
+    user_prompt: str | None,
+    payload: A2UIScreen | A2UIClarification,
+    tool_names: list[str],
+    tool_args: dict,
+    data_snapshot: dict,
+) -> None:
+    intent = _history_intent(tool_names, getattr(payload, "stage_label", ""))
+    db.add(InterfaceHistory(
+        user_id=user_id,
+        title=getattr(payload, "title", None) or getattr(payload, "question", "Interfaz de inversiones")[:80],
+        user_prompt=user_prompt,
+        intent=intent,
+        tool_names=tool_names,
+        tool_args=tool_args,
+        data_snapshot=data_snapshot,
+        a2ui_payload=payload.model_dump(mode="json"),
+    ))
+    state = db.get(SessionState, user_id)
+    if state is None:
+        state = SessionState(user_id=user_id)
+        db.add(state)
+    state.flow_id = state.flow_id or str(uuid4())
+    state.active_intent = intent
+    state.context_json = {
+        "activeModule": "investments",
+        "intent": intent,
+        "toolNames": tool_names,
+        "lastPrompt": user_prompt,
+    }
+    db.commit()
+
 
 def _history(db: Session, user_id: int) -> list[dict]:
     rows = (
         db.query(ConversationTurn)
         .filter(ConversationTurn.user_id == user_id)
-        .order_by(ConversationTurn.id)
+        .order_by(ConversationTurn.id.desc())
+        .limit(MAX_HISTORY_MESSAGES)
         .all()
     )
-    return [json.loads(row.content) for row in rows]
+    messages = [json.loads(row.content) for row in reversed(rows)]
+    # No podemos iniciar el contexto en medio de un bloque assistant/tool.
+    # Recortamos hasta el primer mensaje de usuario para conservar un historial
+    # valido para Chat Completions y evitar que errores antiguos condicionen
+    # indefinidamente solicitudes nuevas.
+    while messages and messages[0].get("role") != "user":
+        messages.pop(0)
+    return messages
 
 
 def _append_history(db: Session, user_id: int, message: dict) -> None:
@@ -110,6 +179,8 @@ def _force_fallback_state(db: Session, user_id: int, envelope: A2UIEnvelope) -> 
         state = SessionState(user_id=user_id)
         db.add(state)
     state.current_stage = payload.stage_kind
+    state.current_state = STAGE_TO_STATE[payload.stage_kind]
+    state.active_module = "investments"
     state.last_screen_id = payload.id
     state.last_screen_payload = payload.model_dump(mode="json")
     state.pending_action = None
@@ -139,6 +210,8 @@ def _accept_ui_transition(
 
     payload_dict = payload.model_dump(mode="json")
     state.current_stage = new_stage
+    state.current_state = STAGE_TO_STATE[new_stage]
+    state.active_module = "investments"
     state.last_screen_id = payload.id
     state.last_screen_payload = payload_dict
     state.pending_action = None
@@ -176,8 +249,23 @@ def run_turn(
         _append_history(db, user_id, user_entry)
         history.append(user_entry)
 
-    system = build_system_prompt(active_categories, user_full_name)
+    state = db.get(SessionState, user_id)
+    system = build_system_prompt(
+        active_categories,
+        user_full_name,
+        {
+            "activeModule": state.active_module if state else "investments",
+            "currentState": state.current_state if state else "READY",
+            "currentStage": state.current_stage if state else "idle",
+            "activeIntent": state.active_intent if state else None,
+            "context": state.context_json if state else {},
+        },
+    )
     client = get_client()
+    requested_prompt = user_message
+    turn_tool_names: list[str] = []
+    turn_tool_args: dict = {}
+    turn_data_snapshot: dict = {}
 
     for _ in range(MAX_TOOL_ITERATIONS):
         response = client.chat.completions.create(
@@ -185,7 +273,10 @@ def run_turn(
             max_tokens=2000,
             messages=[{"role": "system", "content": system}, *history],
             tools=OPENAI_TOOLS,
-            tool_choice="auto",
+            # La experiencia de este modulo es UI generativa: incluso una
+            # aclaracion debe salir como A2UI. Esto evita que el modelo ignore
+            # el catalogo y responda solo texto ante una consulta valida.
+            tool_choice="required",
         )
 
         message = response.choices[0].message
@@ -217,6 +308,9 @@ def run_turn(
         for tc in domain_calls:
             tool_input = json.loads(tc.function.arguments or "{}")
             result = _run_domain_tool(db, user_id, tc.function.name, tool_input)
+            turn_tool_names.append(tc.function.name)
+            turn_tool_args[tc.function.name] = tool_input
+            turn_data_snapshot[tc.function.name] = result
             tool_entry = {
                 "role": "tool",
                 "tool_call_id": tc.id,
@@ -238,6 +332,15 @@ def run_turn(
             _append_history(db, user_id, tool_entry)
             history.append(tool_entry)
             if accepted:
+                _record_interface_history(
+                    db=db,
+                    user_id=user_id,
+                    user_prompt=requested_prompt,
+                    payload=envelope.payload,
+                    tool_names=turn_tool_names,
+                    tool_args=turn_tool_args,
+                    data_snapshot=turn_data_snapshot,
+                )
                 return envelope
             fallback = _fallback_envelope("validacion o transicion fallida")
             _force_fallback_state(db, user_id, fallback)
@@ -247,9 +350,9 @@ def run_turn(
         # seguimos el loop para que el modelo decida el siguiente paso
         # (normalmente emit_screen).
 
-    return ChatTextResponse(
-        payload="Estoy teniendo problemas para armar esa pantalla, ¿puedes reformular tu pregunta?"
-    )
+    fallback = _fallback_envelope("limite de iteraciones alcanzado")
+    _force_fallback_state(db, user_id, fallback)
+    return fallback
 
 
 def run_action_result(
