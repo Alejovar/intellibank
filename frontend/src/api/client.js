@@ -1,3 +1,5 @@
+import { useAppStore } from "../store/useAppStore";
+
 const BASE = "/api";
 
 function authHeaders() {
@@ -16,6 +18,14 @@ async function request(path, options = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    // Un 401 en cualquier endpoint autenticado (no el login en si, donde un
+    // 401 solo significa credenciales incorrectas) indica una sesion
+    // invalida/expirada (p.ej. el backend se reinicio y perdio las sesiones
+    // en memoria). Regresamos a login en vez de dejar al usuario atorado
+    // viendo "Token invalido o expirado" sin poder avanzar.
+    if (res.status === 401 && path !== "/auth/login") {
+      useAppStore.getState().logout();
+    }
     throw new Error(body.detail || `Error ${res.status}`);
   }
   return res.json();
