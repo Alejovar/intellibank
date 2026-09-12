@@ -79,6 +79,21 @@ export const api = {
       body: JSON.stringify({ message, input_mode: inputMode, active_categories: activeCategories }),
     }),
 
+  transcribeAudio: (blob, filename = "dictado.webm") => {
+    const form = new FormData();
+    form.append("audio", blob, filename);
+    const token = localStorage.getItem("banorte_token");
+    return fetch(`${BASE}/voice/transcribe`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: form,
+    }).then(async (res) => {
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.detail || `Error ${res.status}`);
+      return body;
+    });
+  },
+
   /**
    * Unico canal por el que una interaccion con un componente generado
    * (boton, slider, seleccion) llega al backend. Nunca se manda como

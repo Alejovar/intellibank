@@ -1,19 +1,49 @@
 import { useRef, useState } from "react";
+import { api } from "../api/client";
 
 /**
  * Input siempre disponible debajo de la pantalla: texto + microfono.
  * Usa la Web Speech API cuando esta disponible (Chrome/Edge); si no,
- * cae de forma silenciosa a solo-texto (el boton de mic se deshabilita).
+ * graba el audio y recurre a la transcripcion del backend.
  */
 export default function ChatInput({ onSend, disabled, navigation }) {
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
+  const recorderRef = useRef(null);
+  const chunksRef = useRef([]);
 
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const canRecordAudio = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
 
-  const startListening = () => {
-    if (!SpeechRecognition) return;
+  const startListening = async () => {
+    if (!SpeechRecognition) {
+      if (!canRecordAudio) return;
+      if (recorderRef.current?.state === "recording") {
+        recorderRef.current.stop();
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const recorder = new MediaRecorder(stream);
+        chunksRef.current = [];
+        recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((track) => track.stop());
+          recorderRef.current = null;
+          setListening(false);
+          try {
+            const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+            const result = await api.transcribeAudio(blob);
+            if (result.text) onSend(result.text, "voice");
+          } catch { /* El usuario puede volver a intentar; no interrumpimos el chat. */ }
+        };
+        recorder.start();
+        recorderRef.current = recorder;
+        setListening(true);
+      } catch { setListening(false); }
+      return;
+    }
     const recognition = new SpeechRecognition();
     recognition.lang = "es-MX";
     recognition.interimResults = false;
@@ -45,8 +75,8 @@ export default function ChatInput({ onSend, disabled, navigation }) {
         <button
           className={`icon-btn ${listening ? "mic-active" : ""}`}
           onClick={startListening}
-          disabled={disabled || !SpeechRecognition}
-          title={SpeechRecognition ? "Hablar" : "Voz no soportada en este navegador"}
+          disabled={disabled || (!SpeechRecognition && !canRecordAudio)}
+          title={SpeechRecognition || canRecordAudio ? "Hablar" : "Voz no soportada en este navegador"}
         >
           <span className="mic-glyph" />
         </button>

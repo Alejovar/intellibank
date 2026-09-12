@@ -19,3 +19,14 @@ def get_client() -> OpenAI:
 
 def get_model() -> str:
     return _settings.openai_model
+
+
+def transcribe_audio(audio_file, filename: str, content_type: str | None = None) -> str:
+    """Transcribe voz; el modelo conversacional principal sigue siendo texto."""
+    client = get_client()
+    response = client.audio.transcriptions.create(
+        model=_settings.openai_transcription_model,
+        file=(filename, audio_file, content_type or "application/octet-stream"),
+        language="es",
+    )
+    return (getattr(response, "text", "") or "").strip()

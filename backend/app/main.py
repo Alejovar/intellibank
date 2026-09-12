@@ -5,7 +5,7 @@ from .config import get_settings
 from .database import ensure_sqlite_auth_schema
 from .seed import seed_if_empty
 from .llm import mcp_client
-from .routers import accounts, actions, auth, chat
+from .routers import accounts, actions, auth, chat, voice
 
 logging.basicConfig(level=logging.INFO)
 settings = get_settings()
@@ -48,3 +48,4 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(actions.router)
 app.include_router(accounts.router)
+app.include_router(voice.router)
