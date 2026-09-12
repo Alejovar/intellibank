@@ -11,7 +11,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login", response_model=LoginResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)):
     token, user = auth_module.login(body.clave_bancaria, body.password, db)
-    reset_history(user.id)
+    reset_history(db, user.id)
     return LoginResponse(
         token=token, full_name=user.full_name, onboarding_done=user.onboarding_done
     )

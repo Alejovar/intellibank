@@ -159,6 +159,17 @@ class ConversationTurn(Base):
     __tablename__ = "conversation_turns"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
-    role = Column(String)  # user | assistant | tool_result
+    role = Column(String)  # user | assistant | tool
     content = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class SessionState(Base):
+    """Estado autoritativo del flujo A2UI activo para un usuario."""
+    __tablename__ = "session_states"
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    current_stage = Column(String, default="idle")
+    last_screen_id = Column(String, nullable=True)
+    last_screen_payload = Column(JSON, nullable=True)
+    pending_action = Column(JSON, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
