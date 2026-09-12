@@ -32,10 +32,10 @@ export default function OptionsList({ options = [], selectionMode = "single", he
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div className="radio" />
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>
                   {opt.icon ? `${opt.icon} ` : ""}{opt.title}
                 </div>
-                {opt.subtitle && <div style={{ fontSize: 12, color: "var(--ink-600)" }}>{opt.subtitle}</div>}
+                {opt.subtitle && <div style={{ fontSize: 12, color: "var(--ink-500)", marginTop: 1 }}>{opt.subtitle}</div>}
               </div>
             </div>
             {opt.badge && <span className="badge">{opt.badge}</span>}

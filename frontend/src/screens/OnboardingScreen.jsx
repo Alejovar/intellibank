@@ -1,28 +1,27 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { useAppStore } from "../store/useAppStore";
+import { StatusBar } from "../components/PhoneChrome";
 
 // Pantallas FIJAS, no generadas por el LLM (regla del flujo #2).
 const SLIDES = [
   {
-    title: "Tu banco se adapta a ti",
-    text: "En vez de menus fijos, describe lo que necesitas y la app construye la pantalla justo para eso.",
-    icon: "✨",
+    title: "Dime qué necesitas",
+    text: "Escríbelo o dilo con tu voz. No tienes que buscar entre menús interminables.",
+    art: "linear-gradient(150deg,#FBE9ED,#F4DDE3)",
+    artLabel: "ilustración · voz e intención",
   },
   {
-    title: "Habla, escribe o toca",
-    text: "Puedes usar botones, texto o tu voz en cualquier momento. Todo vive en el mismo lugar.",
-    icon: "🎙️",
-  },
-  {
-    title: "Preguntas antes de actuar",
-    text: "Si algo no esta claro, te preguntamos primero. Nunca se ejecuta un cambio real sin tu confirmacion.",
-    icon: "🤝",
+    title: "La pantalla se arma sola",
+    text: "El asistente elige los módulos correctos —tablas, gráficas, simuladores— y los acomoda para tu caso.",
+    art: "linear-gradient(150deg,#F1E9FA,#E7EDFA)",
+    artLabel: "ilustración · UI generativa",
   },
   {
     title: "Guarda lo que te sirve",
-    text: "Cualquier pantalla que armes se puede guardar para reutilizarla despues, o descartar si ya no la necesitas.",
-    icon: "💾",
+    text: "Refina la pantalla hablando con ella y guárdala para volver cuando quieras. Tus saldos siempre están fijos.",
+    art: "linear-gradient(150deg,#EAF6EE,#F3F7EC)",
+    artLabel: "ilustración · pantallas guardadas",
   },
 ];
 
@@ -40,33 +39,24 @@ export default function OnboardingScreen() {
 
   return (
     <div className="phone-shell">
-      <div className="app-header">
-        <div className="brand">Banorte AI</div>
-      </div>
-      <div className="screen-body" style={{ justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-        <div style={{ fontSize: 56 }}>{slide.icon}</div>
-        <div style={{ fontSize: 20, fontWeight: 700, marginTop: 12 }}>{slide.title}</div>
-        <div style={{ fontSize: 14, color: "var(--ink-600)", marginTop: 8, maxWidth: 300 }}>{slide.text}</div>
-
-        <div style={{ display: "flex", gap: 6, marginTop: 22 }}>
+      <StatusBar />
+      <div className="screen-body onboarding">
+        <div className="onboarding-progress">
           {SLIDES.map((_, i) => (
-            <div key={i} style={{
-              width: i === step ? 20 : 7, height: 7, borderRadius: 4,
-              background: i === step ? "var(--banorte-red-500)" : "var(--line-100)",
-              transition: "width 0.2s",
-            }} />
+            <i key={i} className={i <= step ? "complete" : ""} />
           ))}
         </div>
-      </div>
-      <div style={{ padding: 18 }}>
-        <button className="btn btn-primary" onClick={() => (isLast ? finish() : setStep(step + 1))}>
-          {isLast ? "Empezar" : "Siguiente"}
-        </button>
-        {!isLast && (
-          <button className="btn btn-ghost" style={{ marginTop: 6 }} onClick={finish}>
+        <div className="onboarding-art" style={{ background: slide.art }}><span>{slide.artLabel}</span></div>
+        <h1>{slide.title}</h1>
+        <p>{slide.text}</p>
+        <div className="onboarding-actions">
+          {!isLast && <button className="btn btn-ghost" onClick={finish}>
             Saltar
+          </button>}
+          <button className="btn btn-primary" onClick={() => (isLast ? finish() : setStep(step + 1))}>
+            {isLast ? "Empezar" : "Siguiente"}
           </button>
-        )}
+        </div>
       </div>
     </div>
   );

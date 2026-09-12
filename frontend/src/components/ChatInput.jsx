@@ -34,23 +34,37 @@ export default function ChatInput({ onSend, disabled }) {
   };
 
   return (
-    <div className="input-bar">
-      <button
-        className={`icon-btn ${listening ? "mic-active" : ""}`}
-        onClick={startListening}
-        disabled={disabled || !SpeechRecognition}
-        title={SpeechRecognition ? "Hablar" : "Voz no soportada en este navegador"}
-      >
-        🎤
-      </button>
-      <input
-        placeholder="Cuentame lo que necesitas..."
-        value={text}
-        disabled={disabled}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && submit()}
-      />
-      <button className="icon-btn send" onClick={submit} disabled={disabled}>➤</button>
+    <div className={`input-bar ${listening ? "listening" : ""}`}>
+      {listening && (
+        <div className="listening-bars">
+          {[0,1,2,3,4,5,6,7,8].map((n) => <i key={n} />)}
+          <span style={{ marginLeft: 8 }}>Escuchando…</span>
+        </div>
+      )}
+      <div className="composer-row">
+        <button
+          className={`icon-btn ${listening ? "mic-active" : ""}`}
+          onClick={startListening}
+          disabled={disabled || !SpeechRecognition}
+          title={SpeechRecognition ? "Hablar" : "Voz no soportada en este navegador"}
+        >
+          <span className="mic-glyph" />
+        </button>
+        <input
+          placeholder="Cuéntame lo que necesitas…"
+          value={text}
+          disabled={disabled}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+        />
+        <button className="icon-btn send" onClick={submit} disabled={disabled} aria-label="Enviar">▶</button>
+      </div>
+      <div className="dock-nav" aria-hidden="true">
+        {["Inicio", "Guardadas", "Asistente", "Más"].map((label, i) => (
+          <span key={label} className={i === 2 ? "active" : ""}><i />{label}</span>
+        ))}
+      </div>
+      <div className="home-indicator" aria-hidden="true" />
     </div>
   );
 }

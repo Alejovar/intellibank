@@ -1,9 +1,9 @@
 const STAGE_ICON = {
-  intent: "💬",
-  generated: "🧩",
-  interaction: "🎚️",
-  confirmation: "🔐",
-  result: "✅",
+  intent: "·",
+  generated: "◇",
+  interaction: "—",
+  confirmation: "□",
+  result: "✓",
 };
 
 /**
@@ -23,7 +23,7 @@ export default function FlowTrace({ steps, onJump }) {
         return (
           <div key={i} className={`flow-step ${isLast ? "active" : "done"}`}>
             <div className="dot-wrap" onClick={() => onJump && onJump(step.threadIndex)}>
-              <div style={{ fontSize: 13, lineHeight: 1 }}>{STAGE_ICON[step.stageKind] || "•"}</div>
+              <div style={{ fontSize: 13, lineHeight: 1, color: "var(--red-500)", fontWeight: 800 }}>{STAGE_ICON[step.stageKind] || "•"}</div>
               <div className="dot" />
               <div className="label">{step.stageLabel}</div>
             </div>

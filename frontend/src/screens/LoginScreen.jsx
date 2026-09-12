@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api/client";
 import { useAppStore } from "../store/useAppStore";
+import { Brand, StatusBar } from "../components/PhoneChrome";
 
 export default function LoginScreen() {
   const [claveBancaria, setClaveBancaria] = useState("");
@@ -24,43 +25,44 @@ export default function LoginScreen() {
   };
 
   return (
-    <div className="phone-shell">
-      <div className="app-header">
-        <div>
-          <div className="brand">Banorte AI</div>
-          <div className="tagline">Tu banco, a tu manera</div>
-        </div>
+    <div className="phone-shell login-shell">
+      <StatusBar />
+      <div className="access-brand">
+        <Brand />
+        <span>Tu dinero con<br />más posibilidades</span>
       </div>
-      <div className="screen-body" style={{ paddingBottom: 24, justifyContent: "center" }}>
-        <div style={{ textAlign: "center", marginBottom: 8 }}>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>Inicia sesion</div>
-          <div style={{ fontSize: 13, color: "var(--ink-600)" }}>
-            Usa tu clave bancaria y contraseña.
-          </div>
+      <form onSubmit={submit} className="login-content">
+        <div className="login-heading">
+          <h1>Iniciar sesión</h1>
+          <p>Ingresa tu CLABE interbancaria para reconocer tu cuenta.</p>
         </div>
-        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="credential-card">
+          <label className="field-label" htmlFor="clave-bancaria">CLABE interbancaria</label>
           <input
-            placeholder="Clave bancaria"
+            id="clave-bancaria"
+            placeholder="072 180 01234567890"
             value={claveBancaria}
             onChange={(e) => setClaveBancaria(e.target.value)}
-            style={{ padding: 13, borderRadius: 12, border: "1px solid var(--line-100)" }}
           />
+          <span className="field-help">18 dígitos · la encuentras en tu estado de cuenta</span>
+        </div>
+        <div className="credential-card">
+          <label className="field-label" htmlFor="password">Contraseña</label>
           <input
-            placeholder="Contraseña"
+            id="password"
+            placeholder="••••••••"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={{ padding: 13, borderRadius: 12, border: "1px solid var(--line-100)" }}
           />
-          {error && <div style={{ color: "#b3261e", fontSize: 13 }}>{error}</div>}
-          <button className="btn btn-primary" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
-        <div style={{ textAlign: "center", fontSize: 11.5, color: "var(--ink-400)", marginTop: 16 }}>
-          Demo hackathon — clave <b>4152</b> / contraseña <b>demo1234</b>
         </div>
-      </div>
+        {error && <div className="info-banner warning"><span>!</span><span>{error}</span></div>}
+        <button className="btn btn-primary login-cta" disabled={loading}>
+          {loading ? "Entrando…" : "Continuar"}
+        </button>
+        <div className="demo-note">Demo · clave <b>4152</b> / contraseña <b>demo1234</b></div>
+      </form>
+      <div className="brand-wave"><span>Un mejor futuro<br />empieza hoy.</span></div>
     </div>
   );
 }

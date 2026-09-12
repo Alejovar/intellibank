@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import A2UIRenderer from "../components/A2UIRenderer";
 import ChatInput from "../components/ChatInput";
 import FlowTrace from "../components/FlowTrace";
+import { Brand, StatusBar } from "../components/PhoneChrome";
 
 export default function AssistantScreen({ initialMessage }) {
   const thread = useAppStore((s) => s.thread);
@@ -68,12 +69,15 @@ export default function AssistantScreen({ initialMessage }) {
 
   return (
     <div className="phone-shell">
+      <StatusBar />
       <div className="app-header">
+        <button className="back-btn" aria-label="Volver">‹</button>
         <div>
-          <div className="brand">Banorte AI</div>
-          <div className="tagline">Consulta, analiza y actua.</div>
+          <Brand compact />
+          <div className="tagline">Pantalla generada</div>
         </div>
-        <button className="back-btn" style={{ marginLeft: "auto" }} onClick={logout} title="Cerrar sesion">⎋</button>
+        <span className="a2ui-pill" style={{ marginLeft: "auto" }}>A2UI</span>
+        <button className="back-btn" onClick={logout} title="Cerrar sesión" aria-label="Cerrar sesión">⎋</button>
       </div>
 
       {flowTrace.length >= 2 && (
@@ -84,8 +88,13 @@ export default function AssistantScreen({ initialMessage }) {
 
       <div className="screen-body">
         {thread.length === 0 && !loading && (
-          <div style={{ fontSize: 14, color: "var(--ink-600)" }}>
-            Hola, ¿en que te puedo ayudar hoy?
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <span className="eyebrow" style={{ color: "var(--ink-600)", background: "#F2ECED" }}>Pantalla fija</span>
+            <h1 className="screen-title">Hola Daniela,<br />¿en qué te puedo ayudar hoy?</h1>
+            <div className="card" style={{ background: "var(--red-050)" }}>
+              <div className="card-title">Adapta tu interfaz</div>
+              <div className="card-subtitle" style={{ marginBottom: 0 }}>Dime qué necesitas y armaré la pantalla adecuada.</div>
+            </div>
           </div>
         )}
 

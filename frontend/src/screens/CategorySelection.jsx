@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useAppStore } from "../store/useAppStore";
 import ChatInput from "../components/ChatInput";
+import { Brand, StatusBar } from "../components/PhoneChrome";
 
 const CATEGORIES = [
-  { id: "banca_personal", label: "Banca personal", subtemas: ["Cuentas", "Movimientos", "Control de gasto"] },
-  { id: "inversiones", label: "Inversiones", subtemas: ["Perfilamiento", "Portafolios", "Simulacion"] },
-  { id: "credito", label: "Credito", subtemas: ["Precalificacion", "Amortizacion", "Refinanciamiento"] },
-  { id: "pagos", label: "Pagos", subtemas: ["Transferencias", "Cobros", "Conciliacion"] },
-  { id: "seguros", label: "Seguros", subtemas: ["Cotizacion", "Coberturas", "Siniestros"] },
-  { id: "educacion", label: "Educacion financiera", subtemas: ["Diagnostico", "Metas", "Habitos"] },
+  { id: "banca_personal", label: "Banca personal", hint: "Cuentas, movimientos, control de gasto", tint: "#FBE9ED", subtemas: ["Mis cuentas", "Movimientos", "Control de gasto"] },
+  { id: "inversiones", label: "Inversiones", hint: "Perfilamiento, portafolios, simulación", tint: "#EEF3FC", subtemas: ["Perfilamiento", "Portafolios", "Simulación"] },
+  { id: "credito", label: "Crédito", hint: "Precalificación, amortización, refinanciamiento", tint: "#FDF0E3", subtemas: ["Precalificación", "Amortización", "Refinanciamiento"] },
+  { id: "pagos", label: "Pagos", hint: "Transferencias, cobros, conciliación", tint: "#EAF6EE", subtemas: ["Transferencias", "Cobros", "Conciliación"] },
+  { id: "seguros", label: "Seguros", hint: "Cotización, coberturas, siniestros", tint: "#F6F2FA", subtemas: ["Cotización", "Coberturas", "Siniestros"] },
+  { id: "educacion", label: "Educación financiera", hint: "Diagnóstico, metas, hábitos", tint: "#F2ECED", subtemas: ["Diagnóstico", "Metas", "Hábitos"] },
 ];
 
 /**
@@ -41,48 +42,41 @@ export default function CategorySelection({ onContinue }) {
 
   return (
     <div className="phone-shell">
+      <StatusBar />
       <div className="app-header">
+        <button className="back-btn" aria-label="Volver">‹</button>
         <div>
-          <div className="brand">Banorte AI</div>
-          <div className="tagline">¿Como quieres que se adapte tu app hoy?</div>
+          <Brand compact />
+          <div className="tagline">Dime qué necesitas</div>
         </div>
+        <span className="a2ui-pill" style={{ marginLeft: "auto" }}>A2UI</span>
       </div>
       <div className="screen-body">
-        <div style={{ fontSize: 13, color: "var(--ink-600)" }}>
-          Elige una o varias areas, o simplemente cuentame que necesitas abajo.
+        <div>
+          <h1 className="screen-title">¿Sobre qué quieres trabajar?</h1>
+          <p className="screen-copy">Elige uno o varios temas, o descríbelo con tus palabras abajo.</p>
         </div>
-
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        <div className="category-list">
           {CATEGORIES.map((cat) => (
-            <button
-              key={cat.id}
-              className={`category-chip ${activeCategories.includes(cat.label) ? "selected" : ""}`}
-              onClick={() => handleChipClick(cat)}
-            >
-              {cat.label}
-            </button>
+            <div key={cat.id} className={`category-item ${expanded === cat.id ? "open" : ""}`}>
+              <button className="category-row" onClick={() => handleChipClick(cat)}>
+                <span className="category-icon" style={{ background: cat.tint }} />
+                <span style={{ flex: 1 }}>
+                  <strong style={{ display: "block", fontSize: 14.5 }}>{cat.label}</strong>
+                  <span style={{ display: "block", marginTop: 1, color: "var(--ink-500)", fontSize: 12 }}>{cat.hint}</span>
+                </span>
+                <span className="category-chevron">›</span>
+              </button>
+              {expanded === cat.id && (
+                <div className="category-subs">
+                  {cat.subtemas.map((sub) => (
+                    <button key={sub} className={`category-chip ${selectedSubtemas.includes(sub) ? "selected" : ""}`} onClick={() => toggleSubtema(sub)}>{sub}</button>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </div>
-
-        {expanded && (
-          <div className="card">
-            <div className="card-subtitle" style={{ marginBottom: 8 }}>
-              ¿Algo en particular dentro de {CATEGORIES.find((c) => c.id === expanded).label.toLowerCase()}?
-            </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {CATEGORIES.find((c) => c.id === expanded).subtemas.map((sub) => (
-                <button
-                  key={sub}
-                  className={`category-chip ${selectedSubtemas.includes(sub) ? "selected" : ""}`}
-                  onClick={() => toggleSubtema(sub)}
-                >
-                  {sub}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
         {(activeCategories.length > 0 || selectedSubtemas.length > 0) && (
           <button
             className="btn btn-primary"
@@ -95,6 +89,9 @@ export default function CategorySelection({ onContinue }) {
             Continuar
           </button>
         )}
+        <div style={{ border: "1px dashed #E7D4D8", borderRadius: 16, padding: "13px 14px", background: "#FDFAFA", color: "var(--ink-600)", fontSize: 12, lineHeight: 1.5 }}>
+          O dilo tú: <strong style={{ color: "var(--red-500)" }}>“quiero pagar menos intereses de mi tarjeta”</strong>
+        </div>
       </div>
       <ChatInput onSend={handleFreeInput} />
     </div>

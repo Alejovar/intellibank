@@ -48,12 +48,15 @@ export default function A2UIRenderer({ envelope, onSaveOrDiscard }) {
 
   if (payload.type === "a2ui.clarify") {
     return (
-      <div className="card">
-        <div className="card-title">{payload.question}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+          <span style={{ width: 26, height: 26, flex: "none", borderRadius: 9, background: "var(--red-500)", transform: "rotate(45deg)" }} />
+          <div className="chat-bubble assistant" style={{ maxWidth: "none" }}>{payload.question}</div>
+        </div>
         {payload.options?.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {payload.options.map((opt, i) => (
-              <button key={i} className="btn btn-secondary" onClick={() => handleClarificationChoice(opt)}>
+              <button key={i} className="btn btn-secondary" style={{ textAlign: "left", justifyContent: "flex-start", padding: "13px 14px" }} onClick={() => handleClarificationChoice(opt)}>
                 {opt}
               </button>
             ))}
@@ -65,12 +68,13 @@ export default function A2UIRenderer({ envelope, onSaveOrDiscard }) {
 
   // payload.type === "a2ui.screen"
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 14, animation: "riseIn .22s ease" }}>
+      <div className="eyebrow">Generada por IA</div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "0 2px", gap: 10 }}>
         <div>
-          <div style={{ fontSize: 17, fontWeight: 700 }}>{payload.title}</div>
+          <div className="screen-title">{payload.title}</div>
           {payload.subtitle && (
-            <div style={{ fontSize: 13, color: "var(--ink-600)" }}>{payload.subtitle}</div>
+            <div className="screen-copy">{payload.subtitle}</div>
           )}
         </div>
         {payload.stage_label && <span className="badge" style={{ flexShrink: 0 }}>{payload.stage_label}</span>}
@@ -80,7 +84,7 @@ export default function A2UIRenderer({ envelope, onSaveOrDiscard }) {
         const Component = COMPONENT_REGISTRY[comp.component];
         if (!Component) {
           return (
-            <div key={comp.id} className="card" style={{ borderColor: "#b3261e" }}>
+            <div key={comp.id} className="card" style={{ borderColor: "var(--red-500)" }}>
               Componente no reconocido en el catalogo: {comp.component}
             </div>
           );

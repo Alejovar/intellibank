@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis
 
 export default function ExpenseChart({ chartType = "donut", data = [], total, centerLabel, insightText }) {
   const fmt = (n) => (n ?? 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+  const palette = ["#C2002E", "#2D6FE0", "#8B5CF6", "#B9AFB2"];
 
   return (
     <div className="card">
@@ -9,11 +10,11 @@ export default function ExpenseChart({ chartType = "donut", data = [], total, ce
         <>
           <div className="card-title">{centerLabel || "Tus gastos"}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ width: 130, height: 130, position: "relative", flexShrink: 0 }}>
+            <div style={{ width: 118, height: 118, position: "relative", flexShrink: 0 }}>
               <ResponsiveContainer>
                 <PieChart>
-                  <Pie data={data} dataKey="value" nameKey="label" innerRadius={38} outerRadius={60} paddingAngle={2}>
-                    {data.map((d, i) => <Cell key={i} fill={d.color || "#ccc"} />)}
+                  <Pie data={data} dataKey="value" nameKey="label" innerRadius={39} outerRadius={59} paddingAngle={0}>
+                    {data.map((d, i) => <Cell key={i} fill={d.color || palette[i % palette.length]} />)}
                   </Pie>
                 </PieChart>
               </ResponsiveContainer>
@@ -21,18 +22,18 @@ export default function ExpenseChart({ chartType = "donut", data = [], total, ce
                 position: "absolute", inset: 0, display: "flex", flexDirection: "column",
                 alignItems: "center", justifyContent: "center", pointerEvents: "none",
               }}>
-                <div style={{ fontSize: 10, color: "var(--ink-600)" }}>Total</div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>{fmt(total)}</div>
+                <div style={{ fontSize: 10.5, color: "var(--ink-500)", fontWeight: 700 }}>Total</div>
+                <div style={{ fontSize: 15, fontWeight: 800, letterSpacing: "-.02em" }}>{fmt(total)}</div>
               </div>
             </div>
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 9 }}>
               {data.map((d, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5 }}>
                   <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 4, background: d.color }} />
+                    <span style={{ width: 9, height: 9, borderRadius: 9, background: d.color || palette[i % palette.length] }} />
                     {d.label}
                   </span>
-                  <span style={{ fontWeight: 600 }}>{d.pct}%</span>
+                  <span style={{ fontWeight: 800, color: "var(--ink-600)" }}>{d.pct}%</span>
                 </div>
               ))}
             </div>
@@ -46,8 +47,8 @@ export default function ExpenseChart({ chartType = "donut", data = [], total, ce
               <LineChart data={data.map((d) => ({ x: d.label ?? d.x, y: d.value ?? d.y }))}>
                 <XAxis dataKey="x" tick={{ fontSize: 11 }} stroke="var(--ink-400)" />
                 <YAxis hide />
-                <Tooltip formatter={(v) => fmt(v)} />
-                <Line type="monotone" dataKey="y" stroke="var(--banorte-red-500)" strokeWidth={2.5} dot={{ r: 3 }} />
+              <Tooltip formatter={(v) => fmt(v)} contentStyle={{ border: "1px solid #F0E6E8", borderRadius: 13, fontFamily: "Manrope" }} />
+              <Line type="monotone" dataKey="y" stroke="var(--red-500)" strokeWidth={2.5} dot={{ r: 3, fill: "#C2002E" }} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -55,7 +56,7 @@ export default function ExpenseChart({ chartType = "donut", data = [], total, ce
       )}
       {insightText && (
         <div className="info-banner warning" style={{ marginTop: 10 }}>
-          <span>📈</span><span>{insightText}</span>
+          <span style={{ fontWeight: 800 }}>↗</span><span>{insightText}</span>
         </div>
       )}
     </div>
