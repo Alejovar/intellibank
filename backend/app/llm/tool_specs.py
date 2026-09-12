@@ -68,6 +68,66 @@ DOMAIN_TOOLS = [
         },
     },
     {
+        "name": "get_investment_profile",
+        "description": "Obtiene el perfil de riesgo actual del usuario.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_investment_products",
+        "description": "Lista productos de inversion activos y sus tasas definidas por el catalogo financiero.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "risk_profile": {
+                    "type": "string",
+                    "enum": ["conservador", "moderado", "dinamico"],
+                },
+            },
+            "required": [],
+        },
+    },
+    {
+        "name": "get_portfolio",
+        "description": "Obtiene posiciones con costo base, valor actual y ganancia/perdida; es complementario al resumen de liquidez por categoria.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_investment_cashflows",
+        "description": "Lista aportaciones, retiros, ganancias y cargos del portafolio.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "default": 20}},
+            "required": [],
+        },
+    },
+    {
+        "name": "calculate_performance",
+        "description": "Calcula rendimiento total y por posicion del portafolio.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "compare_investments",
+        "description": "Compara hasta cuatro productos de inversion para un monto y plazo dados.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "product_ids": {"type": "array", "items": {"type": "string"}, "minItems": 2},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+                "term_months": {"type": "integer", "exclusiveMinimum": 0},
+            },
+            "required": ["product_ids", "amount", "term_months"],
+        },
+    },
+    {
+        "name": "get_investment_history",
+        "description": "Lista las interfaces generadas anteriormente con titulo, intencion y fecha.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"limit": {"type": "integer", "default": 20}},
+            "required": [],
+        },
+    },
+    {
         "name": "get_investment_options",
         "description": "Regresa productos de inversion sugeridos segun perfil de riesgo y monto.",
         "input_schema": {
@@ -405,6 +465,9 @@ _COMPONENT_SCHEMA = {
                 "PaymentSlider", "TransferForm", "SharedExpenseList",
                 "ConfirmationSummary", "SuccessScreen", "InfoBanner", "TextBlock",
                 "MarketWatchlist", "CurrencyExchangeCard",
+                "PortfolioSummaryCard", "InvestmentPositionCard", "PortfolioTable",
+                "PerformanceChart", "CashflowTable", "InvestmentComparison",
+                "InvestmentProductList", "RiskProfileSelector", "BeforeAfterPortfolio",
             ],
         },
         "props": {"type": "object"},

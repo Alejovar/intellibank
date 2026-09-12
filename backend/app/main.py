@@ -2,10 +2,10 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
-from .database import ensure_sqlite_auth_schema
+from .database import ensure_sqlite_auth_schema, ensure_sqlite_investment_schema
 from .seed import seed_if_empty
 from .llm import mcp_client
-from .routers import accounts, actions, auth, chat, voice
+from .routers import accounts, actions, auth, chat, investments, voice
 
 logging.basicConfig(level=logging.INFO)
 settings = get_settings()
@@ -30,6 +30,7 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     ensure_sqlite_auth_schema()
+    ensure_sqlite_investment_schema()
     seed_if_empty()
     mcp_client.start()
 
@@ -48,4 +49,5 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(actions.router)
 app.include_router(accounts.router)
+app.include_router(investments.router)
 app.include_router(voice.router)

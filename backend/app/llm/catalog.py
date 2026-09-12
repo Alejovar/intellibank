@@ -80,6 +80,46 @@ CATALOGO CERRADO DE COMPONENTES (usa EXACTAMENTE estos nombres en "component"):
     { from_currency, to_currency, amount, rate, converted_amount }.
     Uso: mostrar una cotizacion de divisas y su boton "Confirmar cambio".
 
+14. PortfolioSummaryCard
+    props: { totalInvested, totalValue, totalGain, gainPct, asOf? }
+    Uso: resumen de costo base, valor actual y rendimiento del portafolio.
+
+15. InvestmentPositionCard
+    props: { product, amount, currentValue, gain, gainPct, risk?, status? }
+    Uso: mostrar una posicion individual con sus metricas.
+
+16. PortfolioTable
+    props: { columns?: [string], rows: [{ product, amount, currentValue, gain, gainPct }] }
+    Uso: tabla detallada de posiciones del portafolio.
+
+17. PerformanceChart
+    props: { data: [{ label, value, returnPct? }], totalGain, returnPct, period? }
+    Uso: visualizar rendimiento agregado y por posicion.
+
+18. CashflowTable
+    props: { transactions: [{ date, type, description, amount }], totalDeposits?,
+             totalWithdrawals?, totalGains? }
+    Uso: aportaciones, retiros, ganancias y cargos del portafolio.
+
+19. InvestmentComparison
+    props: { products: [{ title, risk, rate, amount, termMonths, finalValue, estimatedGain }] }
+    Uso: comparar hasta cuatro alternativas de inversion.
+
+20. InvestmentProductList
+    props: { products: [{ id, title, description?, risk, rate, minAmount }] }
+    actions: seleccionar un producto para simular.
+    Uso: productos disponibles segun perfil y monto.
+
+21. RiskProfileSelector
+    props: { currentProfile?, options: [{ id, title, description }] }
+    actions: guardar un perfil de riesgo.
+    Uso: perfilamiento de inversion.
+
+22. BeforeAfterPortfolio
+    props: { before: { totalValue, totalGain, capturedAt? },
+             after: { totalValue, totalGain, capturedAt? } }
+    Uso: comparar una interfaz historica contra los datos actuales.
+
 REGLAS DE COMPOSICION:
 - Una pantalla (A2UIScreen) puede combinar 1 a 4 componentes en layout "stack" (vertical)
   o "grid".
@@ -98,6 +138,11 @@ REGLAS DE COMPOSICION:
   saltos bruscos de "pregunta" a "confirmacion" sin pasar por una pantalla de opciones/ajuste.
 - Los datos financieros reales (saldos, movimientos, tasas) SIEMPRE deben venir de los
   resultados de tools que ya llamaste. Nunca inventes cifras.
+- Para posiciones, rendimiento y flujos usa get_portfolio, calculate_performance y
+  get_investment_cashflows; no los confundas con get_portfolio_overview, que incluye
+  liquidez y agrupacion por categoria.
+- Para historial usa get_investment_history; las tasas y productos deben venir de
+  get_investment_products o get_investment_options.
 - saveable=false SOLO para pantallas de saldo/resumen fijo que el sistema ya definio como
   no editables (ej. BalanceCard principal mostrado solo).
 """

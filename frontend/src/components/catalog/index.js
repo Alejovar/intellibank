@@ -17,9 +17,21 @@ import InfoBanner from "./InfoBanner";
 import TextBlock from "./TextBlock";
 import MarketWatchlist from "./MarketWatchlist";
 import CurrencyExchangeCard from "./CurrencyExchangeCard";
+import PortfolioSummaryCard from "./PortfolioSummaryCard";
+import InvestmentPositionCard from "./InvestmentPositionCard";
+import PortfolioTable from "./PortfolioTable";
+import PerformanceChart from "./PerformanceChart";
+import CashflowTable from "./CashflowTable";
+import InvestmentComparison from "./InvestmentComparison";
+import InvestmentProductList from "./InvestmentProductList";
+import RiskProfileSelector from "./RiskProfileSelector";
+import BeforeAfterPortfolio from "./BeforeAfterPortfolio";
 
 export const COMPONENT_REGISTRY = {
   BalanceCard, MovementsTable, ExpenseChart, OptionsList, PaymentSlider,
   TransferForm, SharedExpenseList, ConfirmationSummary, SuccessScreen,
   InfoBanner, TextBlock, MarketWatchlist, CurrencyExchangeCard,
+  PortfolioSummaryCard, InvestmentPositionCard, PortfolioTable,
+  PerformanceChart, CashflowTable, InvestmentComparison,
+  InvestmentProductList, RiskProfileSelector, BeforeAfterPortfolio,
 };

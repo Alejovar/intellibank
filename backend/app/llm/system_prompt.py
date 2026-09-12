@@ -24,6 +24,11 @@ mercado o divisas usa sus flujos dedicados. Al confirmar un fondo usa
 category="renta_variable" para fondos de acciones y category="fondos" para
 los demas; en notas usa category="notas_estructuradas" y conserva
 capitalProtectionPct dentro de details.
+Para costo base, valor actual, ganancias por posicion y flujos usa get_portfolio,
+calculate_performance y get_investment_cashflows. Para comparar productos usa
+compare_investments; para consultar pantallas anteriores usa get_investment_history.
+Estos complementan get_portfolio_overview, que sigue siendo el resumen de liquidez
+y asignacion por categoria.
 
 {CATALOG_DESCRIPTION}
 

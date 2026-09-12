@@ -102,14 +102,54 @@ class Investment(Base):
     __tablename__ = "investments"
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"))
+    product_id = Column(String, nullable=True)
     product = Column(String)
     amount = Column(Float)
+    current_value = Column(Float, nullable=True)
     term_months = Column(Integer)
     estimated_rate = Column(Float)
     status = Column(String, default="simulado")  # simulado | activo
     category = Column(String, nullable=True)  # general | renta_fija | deuda | ...
     details = Column(JSON, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    opened_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
+
+
+class InvestmentTransaction(Base):
+    """Movimientos de dinero asociados a una posicion de inversion."""
+    __tablename__ = "investment_transactions"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    investment_id = Column(Integer, ForeignKey("investments.id"), nullable=True)
+    transaction_type = Column(String, nullable=False)  # deposit | withdrawal | gain | fee
+    amount = Column(Float, nullable=False)
+    description = Column(String, nullable=True)
+    occurred_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class InvestmentProduct(Base):
+    """Catalogo de productos que el agente puede recomendar."""
+    __tablename__ = "investment_products"
+    id = Column(String, primary_key=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    risk_level = Column(String, nullable=False)
+    annual_rate = Column(Float, nullable=False)
+    min_amount = Column(Float, default=0.0)
+    active = Column(Boolean, default=True, nullable=False)
+
+
+class PortfolioSnapshot(Base):
+    """Foto historica del portafolio para comparaciones antes/despues."""
+    __tablename__ = "portfolio_snapshots"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    total_invested = Column(Float, nullable=False, default=0.0)
+    total_value = Column(Float, nullable=False, default=0.0)
+    total_gain = Column(Float, nullable=False, default=0.0)
+    positions = Column(JSON, default=list)
+    captured_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 class InsurancePolicy(Base):
@@ -163,6 +203,21 @@ class SavedScreen(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="generated_screens")
+
+
+class InterfaceHistory(Base):
+    """Registro reproducible de cada interfaz generada por una pregunta."""
+    __tablename__ = "interface_history"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    title = Column(String, nullable=False)
+    user_prompt = Column(Text, nullable=True)
+    intent = Column(String, nullable=True)
+    tool_names = Column(JSON, default=list)
+    tool_args = Column(JSON, default=dict)
+    data_snapshot = Column(JSON, default=dict)
+    a2ui_payload = Column(JSON, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 class AuthDevice(Base):

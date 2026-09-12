@@ -44,6 +44,28 @@ def ensure_sqlite_auth_schema() -> None:
                     ))
 
 
+def ensure_sqlite_investment_schema() -> None:
+    """Agrega solo columnas de seguimiento de inversiones a SQLite."""
+    if not settings.database_url.startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    if "investments" not in inspector.get_table_names():
+        return
+    additions = {
+        "product_id": "VARCHAR",
+        "current_value": "FLOAT",
+        "opened_at": "DATETIME",
+        "updated_at": "DATETIME",
+    }
+    existing = {column["name"] for column in inspector.get_columns("investments")}
+    with engine.begin() as connection:
+        for column, definition in additions.items():
+            if column not in existing:
+                connection.execute(text(
+                    f'ALTER TABLE "investments" ADD COLUMN "{column}" {definition}'
+                ))
+
+
 def get_db():
     db = SessionLocal()
     try:

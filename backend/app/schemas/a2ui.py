@@ -36,6 +36,15 @@ COMPONENT_CATALOG = {
     "TextBlock",
     "MarketWatchlist",
     "CurrencyExchangeCard",
+    "PortfolioSummaryCard",
+    "InvestmentPositionCard",
+    "PortfolioTable",
+    "PerformanceChart",
+    "CashflowTable",
+    "InvestmentComparison",
+    "InvestmentProductList",
+    "RiskProfileSelector",
+    "BeforeAfterPortfolio",
 }
 
 

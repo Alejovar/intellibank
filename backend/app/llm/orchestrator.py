@@ -16,7 +16,7 @@ from .client import get_client, get_model
 from . import mcp_client
 from .system_prompt import build_system_prompt
 from .tool_specs import OPENAI_TOOLS
-from ..models import ConversationTurn, SessionState
+from ..models import ConversationTurn, InterfaceHistory, SessionState
 from ..schemas.a2ui import A2UIScreen, A2UIClarification, A2UIEnvelope
 from ..schemas.chat import ChatTextResponse
 
@@ -45,6 +45,50 @@ ALLOWED_STAGE_TRANSITIONS = {
 # -- y lo unico que le importa a la seguridad -- es que nunca se salte
 # "confirmation" antes de una accion irreversible; eso vive en la validacion
 # de POST /actions/execute (ver routers/actions.py), no en esta tabla.
+
+
+def _history_intent(tool_names: list[str], stage_label: str) -> str:
+    intent_by_tool = {
+        "get_portfolio": "view_portfolio",
+        "get_portfolio_overview": "view_portfolio_overview",
+        "get_investment_cashflows": "view_cashflows",
+        "calculate_performance": "view_performance",
+        "compare_investments": "compare_investments",
+        "get_investment_history": "view_interface_history",
+        "simulate_investment": "simulate_investment",
+        "confirm_investment": "confirm_investment",
+        "set_investment_profile": "set_investment_profile",
+    }
+    for name in tool_names:
+        if name in intent_by_tool:
+            return intent_by_tool[name]
+    return (stage_label or "generated_view").strip().lower().replace(" ", "_")
+
+
+def _record_interface_history(
+    db: Session,
+    user_id: int,
+    user_prompt: str | None,
+    payload: A2UIScreen | A2UIClarification,
+    tool_names: list[str],
+    tool_args: dict,
+    data_snapshot: dict,
+) -> None:
+    """Persiste una pantalla aceptada sin modificar el estado de sesion."""
+    db.add(InterfaceHistory(
+        user_id=user_id,
+        title=(
+            getattr(payload, "title", None)
+            or getattr(payload, "question", "Interfaz generada")[:80]
+        ),
+        user_prompt=user_prompt,
+        intent=_history_intent(tool_names, getattr(payload, "stage_label", "")),
+        tool_names=tool_names,
+        tool_args=tool_args,
+        data_snapshot=data_snapshot,
+        a2ui_payload=payload.model_dump(mode="json"),
+    ))
+    db.commit()
 
 
 def _history(db: Session, user_id: int) -> list[dict]:
@@ -191,6 +235,10 @@ def run_turn(
 
     system = build_system_prompt(active_categories, user_full_name)
     client = get_client()
+    requested_prompt = user_message
+    turn_tool_names: list[str] = []
+    turn_tool_args: dict = {}
+    turn_data_snapshot: dict = {}
 
     for _ in range(MAX_TOOL_ITERATIONS):
         response = client.chat.completions.create(
@@ -244,6 +292,9 @@ def run_turn(
         for tc, name in domain_calls:
             tool_input = json.loads(tc.function.arguments or "{}")
             result = _run_domain_tool(db, user_id, name, tool_input)
+            turn_tool_names.append(name)
+            turn_tool_args[name] = tool_input
+            turn_data_snapshot[name] = result
             tool_entry = {
                 "role": "tool",
                 "tool_call_id": tc.id,
@@ -266,6 +317,15 @@ def run_turn(
             _append_history(db, user_id, tool_entry)
             history.append(tool_entry)
             if accepted:
+                _record_interface_history(
+                    db=db,
+                    user_id=user_id,
+                    user_prompt=requested_prompt,
+                    payload=envelope.payload,
+                    tool_names=turn_tool_names,
+                    tool_args=turn_tool_args,
+                    data_snapshot=turn_data_snapshot,
+                )
                 return envelope
             fallback = _fallback_envelope("validacion o transicion fallida")
             _force_fallback_state(db, user_id, fallback)
