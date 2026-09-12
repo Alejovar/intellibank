@@ -108,6 +108,100 @@ DOMAIN_TOOLS = [
         },
     },
     {
+        "name": "get_insurance_products",
+        "description": "Regresa productos sinteticos de seguro disponibles con prima, cobertura y deducible.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "quote_insurance",
+        "description": "Calcula una cotizacion deterministica para un producto y nivel de cobertura.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "product_id": {"type": "string", "enum": ["auto", "vida", "hogar"]},
+                "coverage_level": {"type": "string", "enum": ["basica", "amplia", "premium"]},
+            },
+            "required": ["product_id", "coverage_level"],
+        },
+    },
+    {
+        "name": "confirm_insurance_policy",
+        "description": "Confirma y registra una poliza de seguro despues de que el usuario revisa la cotizacion.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "product_id": {"type": "string", "enum": ["auto", "vida", "hogar"]},
+                "product_title": {"type": "string"},
+                "monthly_premium": {"type": "number", "exclusiveMinimum": 0},
+                "coverage_level": {"type": "string", "enum": ["basica", "amplia", "premium"]},
+            },
+            "required": ["product_id", "product_title", "monthly_premium", "coverage_level"],
+        },
+    },
+    {
+        "name": "get_insurance_claims_info",
+        "description": "Regresa pasos, documentos y canales para reportar un siniestro, junto con las polizas activas del usuario.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "file_insurance_claim",
+        "description": "Registra un reporte de siniestro contra una poliza activa del usuario.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "policy_id": {"type": "integer"},
+                "description": {"type": "string", "minLength": 1},
+            },
+            "required": ["policy_id", "description"],
+        },
+    },
+    {
+        "name": "get_financial_diagnosis",
+        "description": "Calcula un diagnostico de salud financiera con datos reales de saldo, movimientos y credito del usuario.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "set_financial_goal",
+        "description": "Crea una meta financiera con monto y fecha objetivo.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "goal_name": {"type": "string"},
+                "target_amount": {"type": "number", "exclusiveMinimum": 0},
+                "target_date": {"type": "string", "description": "ISO date YYYY-MM-DD"},
+            },
+            "required": ["goal_name", "target_amount", "target_date"],
+        },
+    },
+    {
+        "name": "get_financial_goals",
+        "description": "Lista las metas financieras del usuario con monto ahorrado y porcentaje de avance.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "contribute_to_goal",
+        "description": "Registra una aportacion a una meta financiera sin exceder su monto objetivo.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "goal_id": {"type": "integer"},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": ["goal_id", "amount"],
+        },
+    },
+    {
+        "name": "get_habit_tips",
+        "description": "Regresa consejos breves, sinteticos y deterministas para ahorro, gasto o deuda.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "focus_area": {"type": "string", "enum": ["ahorro", "gasto", "deuda"]},
+            },
+            "required": ["focus_area"],
+        },
+    },
+    {
         "name": "get_expenses_summary",
         "description": "Regresa el desglose de gastos por categoria del mes actual, con insights.",
         "input_schema": {"type": "object", "properties": {}, "required": []},

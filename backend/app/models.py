@@ -102,6 +102,38 @@ class Investment(Base):
     status = Column(String, default="simulado")  # simulado | activo
 
 
+class InsurancePolicy(Base):
+    __tablename__ = "insurance_policies"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    product = Column(String)
+    coverage_level = Column(String)
+    monthly_premium = Column(Float)
+    status = Column(String, default="activa")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class InsuranceClaim(Base):
+    __tablename__ = "insurance_claims"
+    id = Column(Integer, primary_key=True)
+    policy_id = Column(Integer, ForeignKey("insurance_policies.id"))
+    user_id = Column(Integer, ForeignKey("users.id"))
+    description = Column(Text)
+    status = Column(String, default="en revision")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class FinancialGoal(Base):
+    __tablename__ = "financial_goals"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    name = Column(String)
+    target_amount = Column(Float)
+    target_date = Column(DateTime)
+    saved_amount = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 class SharedExpenseGroup(Base):
     __tablename__ = "shared_expense_groups"
     id = Column(Integer, primary_key=True)

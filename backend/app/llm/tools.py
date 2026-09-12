@@ -15,7 +15,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from ..models import (
     Account, Movement, CreditAccount, ExpenseLimit, ScheduledPayment,
-    InvestmentProfile, Investment, SharedExpenseGroup,
+    InvestmentProfile, Investment, InsurancePolicy, InsuranceClaim,
+    FinancialGoal, SharedExpenseGroup,
 )
 
 
@@ -162,6 +163,259 @@ def confirm_investment(db: Session, user_id: int, product_id: str, product_title
     return {"confirmed": True, "investmentId": inv.id}
 
 
+# ---------------------------------------------------------------- seguros
+_INSURANCE_PRODUCTS = {
+    "auto": {
+        "id": "auto", "title": "Seguro de auto", "monthlyPremium": 620.0,
+        "coverageSummary": "Danos a terceros, robo total y asistencia vial",
+        "deductible": "5% danos materiales / 10% robo total", "icon": "auto",
+    },
+    "vida": {
+        "id": "vida", "title": "Seguro de vida", "monthlyPremium": 390.0,
+        "coverageSummary": "Proteccion por fallecimiento e invalidez total",
+        "deductible": "Sin deducible", "icon": "vida",
+    },
+    "hogar": {
+        "id": "hogar", "title": "Seguro de hogar", "monthlyPremium": 470.0,
+        "coverageSummary": "Incendio, robo y danos por agua",
+        "deductible": "$3,000 MXN por evento", "icon": "hogar",
+    },
+}
+
+_COVERAGE_FACTORS = {"basica": 0.8, "amplia": 1.0, "premium": 1.35}
+
+
+def get_insurance_products(db: Session, user_id: int) -> dict:
+    products = []
+    for product in _INSURANCE_PRODUCTS.values():
+        products.append({
+            **product,
+            "subtitle": product["coverageSummary"],
+            "badge": f'Desde ${product["monthlyPremium"]:,.2f}/mes',
+        })
+    return {"products": products}
+
+
+def quote_insurance(db: Session, user_id: int, product_id: str,
+                    coverage_level: str) -> dict:
+    product = _INSURANCE_PRODUCTS.get(product_id)
+    factor = _COVERAGE_FACTORS.get(coverage_level)
+    if not product:
+        return {"error": "producto de seguro no encontrado"}
+    if factor is None:
+        return {"error": "nivel de cobertura no valido"}
+    monthly_premium = round(product["monthlyPremium"] * factor, 2)
+    annual_premium = round(monthly_premium * 12, 2)
+    return {
+        "productId": product_id, "productTitle": product["title"],
+        "coverageLevel": coverage_level, "monthlyPremium": monthly_premium,
+        "annualPremium": annual_premium,
+        "coverageSummary": product["coverageSummary"],
+        "deductible": product["deductible"],
+    }
+
+
+def confirm_insurance_policy(db: Session, user_id: int, product_id: str,
+                             product_title: str, monthly_premium: float,
+                             coverage_level: str) -> dict:
+    if product_id not in _INSURANCE_PRODUCTS:
+        return {"error": "producto de seguro no encontrado"}
+    if coverage_level not in _COVERAGE_FACTORS:
+        return {"error": "nivel de cobertura no valido"}
+    if monthly_premium <= 0:
+        return {"error": "la prima mensual debe ser mayor a cero"}
+    policy = InsurancePolicy(
+        user_id=user_id, product=product_title, coverage_level=coverage_level,
+        monthly_premium=round(monthly_premium, 2), status="activa",
+    )
+    db.add(policy)
+    db.commit()
+    return {
+        "confirmed": True, "policyId": policy.id, "status": policy.status,
+        "title": "Poliza contratada",
+        "message": f"Tu {product_title} ya esta activo.",
+        "details": [
+            {"label": "Cobertura", "value": coverage_level},
+            {"label": "Prima mensual", "value": f"${policy.monthly_premium:,.2f} MXN"},
+            {"label": "Folio", "value": f"POL-{policy.id:06d}"},
+        ],
+    }
+
+
+def get_insurance_claims_info(db: Session, user_id: int) -> dict:
+    policies = db.query(InsurancePolicy).filter(
+        InsurancePolicy.user_id == user_id, InsurancePolicy.status == "activa"
+    ).order_by(InsurancePolicy.id).all()
+    return {
+        "hasActivePolicy": bool(policies),
+        "activePolicies": [
+            {
+                "id": p.id, "title": p.product,
+                "subtitle": f"Cobertura {p.coverage_level}",
+                "badge": f"POL-{p.id:06d}",
+            }
+            for p in policies
+        ],
+        "steps": [
+            "Protege a las personas y evita agravar el dano.",
+            "Documenta el incidente con fotos y una descripcion breve.",
+            "Reporta el siniestro y conserva tu numero de folio.",
+        ],
+        "requiredDocuments": ["Identificacion oficial", "Poliza", "Evidencia del incidente"],
+        "claimsPhone": "800-555-0101",
+        "claimsPortal": "portal.demo/seguros/siniestros",
+    }
+
+
+def file_insurance_claim(db: Session, user_id: int, policy_id: int,
+                         description: str) -> dict:
+    policy = db.query(InsurancePolicy).get(policy_id)
+    if not policy or policy.user_id != user_id or policy.status != "activa":
+        return {"error": "poliza activa no encontrada"}
+    if not description.strip():
+        return {"error": "la descripcion del siniestro es obligatoria"}
+    claim = InsuranceClaim(
+        policy_id=policy.id, user_id=user_id, description=description.strip(),
+        status="en revision",
+    )
+    db.add(claim)
+    db.commit()
+    return {
+        "filed": True, "claimId": claim.id, "policyId": policy.id,
+        "status": claim.status, "title": "Siniestro reportado",
+        "message": "Recibimos tu reporte y un ajustador dara seguimiento.",
+        "details": [
+            {"label": "Folio", "value": f"SIN-{claim.id:06d}"},
+            {"label": "Poliza", "value": f"POL-{policy.id:06d}"},
+            {"label": "Estado", "value": claim.status},
+        ],
+    }
+
+
+# ------------------------------------------------ educacion financiera
+def get_financial_diagnosis(db: Session, user_id: int) -> dict:
+    account = db.query(Account).filter(Account.user_id == user_id).first()
+    movements = []
+    if account:
+        movements = db.query(Movement).filter(Movement.account_id == account.id).all()
+    income = round(sum(m.amount for m in movements if m.amount > 0), 2)
+    expenses = round(sum(abs(m.amount) for m in movements if m.amount < 0), 2)
+    savings = round(max(income - expenses, 0), 2)
+    savings_rate = round((income - expenses) / income * 100, 1) if income else 0.0
+    credit = db.query(CreditAccount).filter(CreditAccount.user_id == user_id).first()
+    credit_utilization = round(credit.balance / credit.credit_limit * 100, 1) \
+        if credit and credit.credit_limit else 0.0
+    savings_points = max(0.0, min(50.0, savings_rate * 2.5))
+    credit_points = max(0.0, min(30.0, 30.0 - credit_utilization * 0.3))
+    liquidity_points = 20.0 if account and account.balance >= expenses else 10.0
+    score = round(max(0.0, min(100.0, savings_points + credit_points + liquidity_points)))
+    level = "saludable" if score >= 75 else "estable" if score >= 50 else "por mejorar"
+    if savings_rate < 10:
+        insight = "Tu principal oportunidad es separar al menos 10% de tus ingresos para ahorro."
+    elif credit_utilization > 30:
+        insight = "Reducir el uso de tu linea de credito puede fortalecer tu salud financiera."
+    else:
+        insight = "Mantienes un buen balance entre ahorro, gasto y uso de credito."
+    total_flow = income + expenses or 1
+    return {
+        "score": score, "level": level, "insight": insight,
+        "monthlyIncome": income, "monthlyExpenses": expenses,
+        "estimatedSavings": savings, "savingsRate": savings_rate,
+        "creditUtilization": credit_utilization,
+        "availableBalance": round(account.balance, 2) if account else 0.0,
+        "chartData": [
+            {"label": "Ingresos", "value": income,
+             "pct": round(income / total_flow * 100), "color": "#2E7BE5"},
+            {"label": "Gastos", "value": expenses,
+             "pct": round(expenses / total_flow * 100), "color": "#EB0029"},
+        ],
+    }
+
+
+def set_financial_goal(db: Session, user_id: int, goal_name: str,
+                       target_amount: float, target_date: str) -> dict:
+    if target_amount <= 0:
+        return {"error": "la meta debe ser mayor a cero"}
+    try:
+        parsed_date = datetime.fromisoformat(target_date)
+    except ValueError:
+        return {"error": "fecha objetivo invalida; usa YYYY-MM-DD"}
+    goal = FinancialGoal(
+        user_id=user_id, name=goal_name, target_amount=round(target_amount, 2),
+        target_date=parsed_date, saved_amount=0.0,
+    )
+    db.add(goal)
+    db.commit()
+    return {
+        "goalId": goal.id, "name": goal.name, "targetAmount": goal.target_amount,
+        "targetDate": goal.target_date.strftime("%Y-%m-%d"),
+        "savedAmount": goal.saved_amount, "progressPercent": 0.0,
+    }
+
+
+def get_financial_goals(db: Session, user_id: int) -> dict:
+    goals = db.query(FinancialGoal).filter(
+        FinancialGoal.user_id == user_id
+    ).order_by(FinancialGoal.id).all()
+    return {"goals": [
+        {
+            "id": goal.id, "title": goal.name,
+            "subtitle": f'${goal.saved_amount:,.2f} de ${goal.target_amount:,.2f} MXN',
+            "badge": f'{round(goal.saved_amount / goal.target_amount * 100)}%',
+            "targetAmount": goal.target_amount, "savedAmount": goal.saved_amount,
+            "targetDate": goal.target_date.strftime("%Y-%m-%d"),
+            "progressPercent": round(goal.saved_amount / goal.target_amount * 100, 1),
+        }
+        for goal in goals
+    ]}
+
+
+def contribute_to_goal(db: Session, user_id: int, goal_id: int, amount: float) -> dict:
+    goal = db.query(FinancialGoal).get(goal_id)
+    if not goal or goal.user_id != user_id:
+        return {"error": "meta financiera no encontrada"}
+    if amount <= 0:
+        return {"error": "la aportacion debe ser mayor a cero"}
+    previous_amount = goal.saved_amount or 0.0
+    goal.saved_amount = round(min(previous_amount + amount, goal.target_amount), 2)
+    applied_amount = round(goal.saved_amount - previous_amount, 2)
+    db.commit()
+    progress = round(goal.saved_amount / goal.target_amount * 100, 1)
+    return {
+        "contributed": True, "goalId": goal.id, "name": goal.name,
+        "appliedAmount": applied_amount, "savedAmount": goal.saved_amount,
+        "targetAmount": goal.target_amount, "progressPercent": progress,
+        "completed": goal.saved_amount >= goal.target_amount,
+    }
+
+
+def get_habit_tips(db: Session, user_id: int, focus_area: str) -> dict:
+    tips_by_area = {
+        "ahorro": [
+            "Aparta una cantidad fija el dia que recibes ingresos.",
+            "Crea una meta con monto y fecha para dar seguimiento semanal.",
+            "Conserva un fondo separado para evitar usarlo en gastos cotidianos.",
+        ],
+        "gasto": [
+            "Define un limite semanal para tus categorias variables.",
+            "Revisa tus movimientos dos veces por semana.",
+            "Espera 24 horas antes de una compra no planeada.",
+        ],
+        "deuda": [
+            "Prioriza la deuda con mayor tasa de interes.",
+            "Paga mas que el minimo siempre que tu presupuesto lo permita.",
+            "Evita nuevas compras a credito mientras reduces el saldo.",
+        ],
+    }
+    tips = tips_by_area.get(focus_area)
+    if tips is None:
+        return {"error": "area de enfoque no valida"}
+    return {
+        "focusArea": focus_area, "title": f"Habitos para {focus_area}",
+        "tips": tips, "text": " ".join(f"{i + 1}. {tip}" for i, tip in enumerate(tips)),
+    }
+
+
 # --------------------------------------------------------- gastos y pagos
 def get_expenses_summary(db: Session, user_id: int) -> dict:
     account = db.query(Account).filter(Account.user_id == user_id).first()
@@ -295,6 +549,16 @@ TOOL_REGISTRY = {
     "get_investment_options": get_investment_options,
     "simulate_investment": simulate_investment,
     "confirm_investment": confirm_investment,
+    "get_insurance_products": get_insurance_products,
+    "quote_insurance": quote_insurance,
+    "confirm_insurance_policy": confirm_insurance_policy,
+    "get_insurance_claims_info": get_insurance_claims_info,
+    "file_insurance_claim": file_insurance_claim,
+    "get_financial_diagnosis": get_financial_diagnosis,
+    "set_financial_goal": set_financial_goal,
+    "get_financial_goals": get_financial_goals,
+    "contribute_to_goal": contribute_to_goal,
+    "get_habit_tips": get_habit_tips,
     "get_expenses_summary": get_expenses_summary,
     "get_movements": get_movements,
     "get_balance": get_balance,

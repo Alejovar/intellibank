@@ -58,7 +58,7 @@ archivos nuevos de la maquina de estados.
 ## Que hay implementado
 
 - **Protocolo A2UI de punta a punta**: el LLM nunca genera JSX/HTML. Emite
-  JSON estructurado a traves de tool-use de Anthropic (`emit_screen` /
+  JSON estructurado a traves de function-calling de OpenAI (`emit_screen` /
   `emit_clarification`), el backend lo valida con Pydantic contra un catalogo
   cerrado de 11 componentes, y solo entonces se manda al cliente envuelto
   como `{ mime_type: "application/a2ui+json", payload: {...} }`. El frontend
@@ -112,10 +112,10 @@ backend/
       chat.py                   Requests/responses de chat y acciones
     llm/
       catalog.py               Descripcion del catalogo para el prompt
-      tool_specs.py             Tools en formato Anthropic (JSON schema)
+      tool_specs.py             Tools en JSON schema, adaptadas a function-calling de OpenAI
       tools.py                  Logica de negocio real (SQLite)
       system_prompt.py          Instrucciones de orquestacion/guia
-      client.py                 Wrapper del SDK de Anthropic
+      client.py                 Wrapper del SDK de OpenAI
       orchestrator.py          *** Loop de tool-use + validacion A2UI ***
     routers/
       auth.py, chat.py, actions.py
@@ -142,7 +142,7 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# edita .env y agrega tu ANTHROPIC_API_KEY
+# edita .env y agrega tu OPENAI_API_KEY
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -167,7 +167,7 @@ por separado).
 
 ## Notas sobre el LLM
 
-- El modelo usado es configurable via `ANTHROPIC_MODEL` en `.env`.
+- El modelo usado es configurable via `OPENAI_MODEL` en `.env` (por defecto `gpt-4o-mini`).
 - Cada usuario tiene un historial de conversacion en memoria (ver
   `_CONVERSATIONS` en `orchestrator.py`). Para produccion, migrar ese
   historial a la tabla `ConversationTurn` que ya esta en `models.py`, o a
@@ -188,7 +188,7 @@ por separado).
 2. Agrega el nombre a `COMPONENT_CATALOG` en `backend/app/schemas/a2ui.py`.
 3. Describe sus props en `backend/app/llm/catalog.py` (esto es lo que el LLM
    "lee" para saber cuando y como usarlo) y en el `_COMPONENT_SCHEMA` de
-   `tool_specs.py` si quieres que Anthropic tambien valide su forma en el
+   `tool_specs.py` si quieres que OpenAI tambien valide su forma en el
    momento de la llamada.
 4. Si el componente necesita datos reales, agrega la tool correspondiente en
    `tools.py` + `tool_specs.py`.
