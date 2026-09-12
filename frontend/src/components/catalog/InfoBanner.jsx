@@ -1,4 +1,4 @@
-const ICONS = { tip: "✓", warning: "!", info: "i", trend: "↗" };
+const ICONS = { tip: "OK", warning: "!", info: "i", trend: "+" };
 
 export default function InfoBanner({ icon = "info", title, text }) {
   const cls = icon === "warning" ? "warning" : icon === "tip" ? "tip" : "";

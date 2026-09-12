@@ -57,4 +57,6 @@ export const api = {
     }),
 
   listSavedScreens: () => request("/actions/saved-screens"),
+
+  getHomeSummary: () => request("/accounts/home-summary"),
 };

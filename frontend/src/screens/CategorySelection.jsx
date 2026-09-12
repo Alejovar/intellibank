@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAppStore } from "../store/useAppStore";
 import ChatInput from "../components/ChatInput";
 import { Brand, StatusBar } from "../components/PhoneChrome";
+import BottomNav from "../components/BottomNav";
 
 const CATEGORIES = [
   { id: "banca_personal", label: "Banca personal", hint: "Cuentas, movimientos, control de gasto", tint: "#FBE9ED", subtemas: ["Mis cuentas", "Movimientos", "Control de gasto"] },
@@ -19,7 +20,7 @@ const CATEGORIES = [
  * categoria que se toca. El usuario tambien puede saltarse todo esto
  * describiendo lo que quiere por texto o voz.
  */
-export default function CategorySelection({ onContinue }) {
+export default function CategorySelection({ onContinue, onNavigate }) {
   const [expanded, setExpanded] = useState(null);
   const [selectedSubtemas, setSelectedSubtemas] = useState([]);
   const toggleCategory = useAppStore((s) => s.toggleCategory);
@@ -44,7 +45,7 @@ export default function CategorySelection({ onContinue }) {
     <div className="phone-shell">
       <StatusBar />
       <div className="app-header">
-        <button className="back-btn" aria-label="Volver">‹</button>
+        <button className="back-btn" onClick={() => onNavigate("home")} aria-label="Volver al inicio">‹</button>
         <div>
           <Brand compact />
           <div className="tagline">Dime qué necesitas</div>
@@ -93,7 +94,10 @@ export default function CategorySelection({ onContinue }) {
           O dilo tú: <strong style={{ color: "var(--red-500)" }}>“quiero pagar menos intereses de mi tarjeta”</strong>
         </div>
       </div>
-      <ChatInput onSend={handleFreeInput} />
+      <ChatInput
+        onSend={handleFreeInput}
+        navigation={<BottomNav activeTab="assistant" onChange={onNavigate} />}
+      />
     </div>
   );
 }

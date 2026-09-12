@@ -3,7 +3,7 @@ const STAGE_ICON = {
   generated: "◇",
   interaction: "—",
   confirmation: "□",
-  result: "✓",
+  result: "OK",
 };
 
 /**

@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .seed import seed_if_empty
-from .routers import auth, chat, actions
+from .routers import accounts, actions, auth, chat
 
 logging.basicConfig(level=logging.INFO)
 settings = get_settings()
@@ -38,3 +38,4 @@ def health():
 app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(actions.router)
+app.include_router(accounts.router)

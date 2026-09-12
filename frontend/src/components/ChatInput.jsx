@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
  * Usa la Web Speech API cuando esta disponible (Chrome/Edge); si no,
  * cae de forma silenciosa a solo-texto (el boton de mic se deshabilita).
  */
-export default function ChatInput({ onSend, disabled }) {
+export default function ChatInput({ onSend, disabled, navigation }) {
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef(null);
@@ -59,12 +59,7 @@ export default function ChatInput({ onSend, disabled }) {
         />
         <button className="icon-btn send" onClick={submit} disabled={disabled} aria-label="Enviar">▶</button>
       </div>
-      <div className="dock-nav" aria-hidden="true">
-        {["Inicio", "Guardadas", "Asistente", "Más"].map((label, i) => (
-          <span key={label} className={i === 2 ? "active" : ""}><i />{label}</span>
-        ))}
-      </div>
-      <div className="home-indicator" aria-hidden="true" />
+      {navigation}
     </div>
   );
 }

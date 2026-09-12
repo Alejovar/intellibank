@@ -1,7 +1,9 @@
 export default function SuccessScreen({ title, message, details = [], actions = [], onAction }) {
   return (
     <div style={{ textAlign: "center", padding: "8px 2px", animation: "riseIn .22s ease" }}>
-      <div className="success-mark"><span>✓</span></div>
+      <div className="success-mark">
+        <span aria-hidden="true"><svg viewBox="0 0 32 32"><path d="m7 16 6 6L26 9" /></svg></span>
+      </div>
       <div style={{ fontSize: 26, fontWeight: 800, letterSpacing: "-.025em" }}>{title}</div>
       <div style={{ fontSize: 14, color: "var(--ink-600)", lineHeight: 1.55, margin: "6px auto 0", maxWidth: 290 }}>{message}</div>
 

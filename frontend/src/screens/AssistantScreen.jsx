@@ -5,8 +5,9 @@ import A2UIRenderer from "../components/A2UIRenderer";
 import ChatInput from "../components/ChatInput";
 import FlowTrace from "../components/FlowTrace";
 import { Brand, StatusBar } from "../components/PhoneChrome";
+import BottomNav from "../components/BottomNav";
 
-export default function AssistantScreen({ initialMessage }) {
+export default function AssistantScreen({ initialMessage, onInitialMessageConsumed, onNavigate, onChangeCategories }) {
   const thread = useAppStore((s) => s.thread);
   const flowTrace = useAppStore((s) => s.flowTrace);
   const pushChat = useAppStore((s) => s.pushChat);
@@ -16,7 +17,6 @@ export default function AssistantScreen({ initialMessage }) {
   const setLoading = useAppStore((s) => s.setLoading);
   const error = useAppStore((s) => s.error);
   const setError = useAppStore((s) => s.setError);
-  const logout = useAppStore((s) => s.logout);
 
   const [toast, setToast] = useState(null);
   const bottomRef = useRef(null);
@@ -45,6 +45,7 @@ export default function AssistantScreen({ initialMessage }) {
     if (initialMessage && !sentInitial.current) {
       sentInitial.current = true;
       send(initialMessage);
+      onInitialMessageConsumed?.();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessage]);
@@ -71,13 +72,13 @@ export default function AssistantScreen({ initialMessage }) {
     <div className="phone-shell">
       <StatusBar />
       <div className="app-header">
-        <button className="back-btn" aria-label="Volver">‹</button>
+        <button className="back-btn" onClick={onChangeCategories} title="Cambiar temas" aria-label="Cambiar temas">‹</button>
         <div>
           <Brand compact />
           <div className="tagline">Pantalla generada</div>
         </div>
         <span className="a2ui-pill" style={{ marginLeft: "auto" }}>A2UI</span>
-        <button className="back-btn" onClick={logout} title="Cerrar sesión" aria-label="Cerrar sesión">⎋</button>
+        <button className="topic-btn" onClick={onChangeCategories}>Temas</button>
       </div>
 
       {flowTrace.length >= 2 && (
@@ -120,16 +121,20 @@ export default function AssistantScreen({ initialMessage }) {
         )}
         {error && (
           <div className="info-banner warning">
-            <span>⚠️</span><span>{error}</span>
+            <span>{error}</span>
           </div>
         )}
         {toast && (
-          <div className="info-banner tip"><span>✅</span><span>{toast}</span></div>
+          <div className="info-banner tip"><span>{toast}</span></div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      <ChatInput onSend={send} disabled={loading} />
+      <ChatInput
+        onSend={send}
+        disabled={loading}
+        navigation={<BottomNav activeTab="assistant" onChange={onNavigate} />}
+      />
     </div>
   );
 }
