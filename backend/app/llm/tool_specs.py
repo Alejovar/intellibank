@@ -1,5 +1,7 @@
 """
-Definicion de tools en formato Anthropic (JSON schema) para el LLM.
+Definicion de tools en JSON schema (name/description/input_schema), agnostico
+de proveedor. OPENAI_TOOLS al final del archivo las adapta al formato de
+function-calling que espera la API de OpenAI (chat.completions).
 
 Hay dos tipos de tools:
   1. Tools de DATOS/ACCION (get_credit_status, apply_credit_plan, etc.):
@@ -272,3 +274,17 @@ UI_TOOLS = [
 ]
 
 ALL_TOOLS = DOMAIN_TOOLS + UI_TOOLS
+
+
+def _to_openai_tool(spec: dict) -> dict:
+    return {
+        "type": "function",
+        "function": {
+            "name": spec["name"],
+            "description": spec["description"],
+            "parameters": spec["input_schema"],
+        },
+    }
+
+
+OPENAI_TOOLS = [_to_openai_tool(t) for t in ALL_TOOLS]

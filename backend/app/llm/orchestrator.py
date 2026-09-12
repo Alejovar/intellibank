@@ -1,7 +1,8 @@
 """
-Orquestador de la conversacion: implementa el loop tool-use de Anthropic,
-ejecuta las tools de dominio contra SQLite, y valida cualquier emision de
-UI contra el esquema A2UI antes de dejarla salir hacia el frontend.
+Orquestador de la conversacion: implementa el loop de function-calling de
+OpenAI, ejecuta las tools de dominio contra SQLite, y valida cualquier
+emision de UI contra el esquema A2UI antes de dejarla salir hacia el
+frontend.
 
 Este es el unico lugar del backend que "habla" con el LLM.
 """
@@ -13,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .client import get_client, get_model
 from .system_prompt import build_system_prompt
-from .tool_specs import ALL_TOOLS
+from .tool_specs import OPENAI_TOOLS
 from .tools import TOOL_REGISTRY
 from ..schemas.a2ui import A2UIScreen, A2UIClarification, A2UIEnvelope
 from ..schemas.chat import ChatTextResponse
@@ -93,53 +94,62 @@ def run_turn(
     client = get_client()
 
     for _ in range(MAX_TOOL_ITERATIONS):
-        response = client.messages.create(
+        response = client.chat.completions.create(
             model=get_model(),
             max_tokens=2000,
-            system=system,
-            messages=history,
-            tools=ALL_TOOLS,
+            messages=[{"role": "system", "content": system}, *history],
+            tools=OPENAI_TOOLS,
+            tool_choice="auto",
         )
 
-        tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
-        text_blocks = [b for b in response.content if b.type == "text"]
+        message = response.choices[0].message
+        tool_calls = message.tool_calls or []
 
-        # Guardamos la respuesta del asistente tal cual (puede tener texto + tool_use)
-        history.append({"role": "assistant", "content": response.content})
+        # Guardamos la respuesta del asistente tal cual (puede tener texto y/o tool_calls)
+        assistant_entry = {"role": "assistant", "content": message.content}
+        if tool_calls:
+            assistant_entry["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in tool_calls
+            ]
+        history.append(assistant_entry)
 
-        if not tool_use_blocks:
+        if not tool_calls:
             # Respuesta en texto plano (p.ej. fuera de dominio, o charla simple)
-            text = "\n".join(b.text for b in text_blocks).strip() or "¿En que mas te puedo ayudar?"
+            text = (message.content or "").strip() or "¿En que mas te puedo ayudar?"
             return ChatTextResponse(payload=text)
 
         # Puede haber una tool de UI y/o varias tools de datos en la misma vuelta.
-        ui_block = next((b for b in tool_use_blocks if b.name in ("emit_screen", "emit_clarification")), None)
-        domain_blocks = [b for b in tool_use_blocks if b.name not in ("emit_screen", "emit_clarification")]
+        ui_call = next((tc for tc in tool_calls if tc.function.name in ("emit_screen", "emit_clarification")), None)
+        domain_calls = [tc for tc in tool_calls if tc.function.name not in ("emit_screen", "emit_clarification")]
 
-        tool_results_content = []
-
-        for block in domain_blocks:
-            result = _run_domain_tool(db, user_id, block.name, block.input)
-            tool_results_content.append({
-                "type": "tool_result",
-                "tool_use_id": block.id,
+        for tc in domain_calls:
+            tool_input = json.loads(tc.function.arguments or "{}")
+            result = _run_domain_tool(db, user_id, tc.function.name, tool_input)
+            history.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
                 "content": json.dumps(result, ensure_ascii=False),
             })
 
-        if ui_block:
-            envelope = _build_ui_response(ui_block.name, ui_block.input)
-            # Cerramos el tool_use con un ack para mantener el historial valido
-            tool_results_content.append({
-                "type": "tool_result",
-                "tool_use_id": ui_block.id,
+        if ui_call:
+            tool_input = json.loads(ui_call.function.arguments or "{}")
+            envelope = _build_ui_response(ui_call.function.name, tool_input)
+            # Cerramos el tool_call con un ack para mantener el historial valido
+            history.append({
+                "role": "tool",
+                "tool_call_id": ui_call.id,
                 "content": json.dumps({"delivered": envelope is not None}),
             })
-            history.append({"role": "user", "content": tool_results_content})
             return envelope or _fallback_envelope("validacion fallida")
 
-        # Solo hubo tools de datos: agregamos resultados y seguimos el loop
-        # para que el modelo decida el siguiente paso (normalmente emit_screen).
-        history.append({"role": "user", "content": tool_results_content})
+        # Solo hubo tools de datos: los resultados ya quedaron en el historial;
+        # seguimos el loop para que el modelo decida el siguiente paso
+        # (normalmente emit_screen).
 
     return ChatTextResponse(
         payload="Estoy teniendo problemas para armar esa pantalla, ¿puedes reformular tu pregunta?"
