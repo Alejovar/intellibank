@@ -4,7 +4,7 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    openai_model: str = "gpt-4o"
     database_url: str = "sqlite:///./banorte_demo.db"
     jwt_secret: str = "dev-secret-change-me"
     cors_origins: str = "http://localhost:5173"

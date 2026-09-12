@@ -173,11 +173,26 @@ por separado).
 
 ## Notas sobre el LLM
 
-- El modelo usado es configurable via `OPENAI_MODEL` en `.env` (por defecto `gpt-4o-mini`).
-- Cada usuario tiene un historial de conversacion en memoria (ver
-  `_CONVERSATIONS` en `orchestrator.py`). Para produccion, migrar ese
-  historial a la tabla `ConversationTurn` que ya esta en `models.py`, o a
-  Redis, para que sobreviva reinicios y escale a mas de un proceso.
+- El modelo usado es configurable via `OPENAI_MODEL` en `.env` (por defecto
+  `gpt-4o`, elegido sobre `gpt-4o-mini` por su seguimiento mas consistente
+  de instrucciones multi-paso de tool-calling; `gpt-4o-mini` funciona pero
+  falla con mas frecuencia en flujos largos).
+- El historial de conversacion se persiste en la tabla `ConversationTurn`
+  (SQLite) por usuario, y sobrevive reinicios del proceso backend. Cada
+  mensaje/tool-call/tool-result de OpenAI se guarda serializado en JSON.
+- Ademas del historial, `SessionState` guarda una maquina de estados real
+  por usuario (`current_stage`, la ultima pantalla mostrada, y una accion
+  pendiente de confirmacion). El LLM elige libremente el `stage_kind` de
+  cada pantalla, pero el backend valida esa transicion contra
+  `ALLOWED_STAGE_TRANSITIONS` en `orchestrator.py` antes de aceptarla — si
+  el LLM intenta un salto no permitido, se degrada a una aclaracion en vez
+  de mandar la pantalla al cliente.
+- Las tools de dominio (`DOMAIN_TOOLS`) NO se ejecutan en el mismo proceso:
+  el LLM las llama via function-calling de OpenAI, pero la ejecucion real
+  cruza un cliente/servidor MCP (`mcp_client.py`/`mcp_server.py`) por stdio
+  contra SQLite. Las tools de emision de UI (`emit_screen`/
+  `emit_clarification`) se quedan locales, ya que son el protocolo propio
+  de la app, no acceso a un sistema externo.
 - El orquestador limita a `MAX_TOOL_ITERATIONS = 6` llamadas de tool por
   turno para evitar loops infinitos; si el modelo no logra emitir una
   pantalla valida en ese margen, se degrada a un mensaje de texto plano
@@ -203,8 +218,20 @@ por separado).
 
 - Datos 100% sinteticos/hardcodeados (sin conexion a sistemas reales de
   Banorte), como pide el stack del hackathon.
-- Autenticacion simplificada (token en memoria, no JWT firmado) — suficiente
-  para demo, no para produccion.
-- El historial de conversacion vive en memoria del proceso backend.
-- La "biometria" en `ConfirmationSummary` es solo visual (no integra un
-  sensor real); el boton dispara el tool real directamente.
+- Autenticacion simplificada (token de sesion en memoria, no JWT firmado) —
+  suficiente para demo, no para produccion; el login sigue viviendo en
+  `_SESSIONS` (dict en memoria) en `auth.py`, asi que un reinicio del
+  backend invalida los tokens activos (el frontend detecta el 401 y
+  regresa a login automaticamente).
+- La "biometria" en `ConfirmationSummary` sigue siendo solo visual (no
+  integra un sensor real), pero el backend ya no confia ciegamente en el
+  boton: `POST /actions/execute` exige que la tool este realmente ofrecida
+  en la ultima pantalla, que el `screen_id` coincida, y que las tools
+  irreversibles (`apply_credit_plan`, `confirm_investment`,
+  `schedule_payment`, `confirm_insurance_policy`, `file_insurance_claim`,
+  `contribute_to_goal`) solo se ejecuten si el usuario paso por una
+  pantalla real de `stage_kind="confirmation"`.
+- Con gpt-4o-mini se observo inconsistencia real en flujos de varios
+  pasos (saltos de estado invalidos, texto plano en vez de una tool call,
+  pantallas sin acciones de seguimiento); `gpt-4o` reduce esto pero no lo
+  elimina del todo — sigue siendo un modelo no determinista.
