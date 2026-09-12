@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import get_settings
 from .seed import seed_if_empty
+from .llm import mcp_client
 from .routers import accounts, actions, auth, chat
 
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +29,12 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     seed_if_empty()
+    mcp_client.start()
+
+
+@app.on_event("shutdown")
+def on_shutdown():
+    mcp_client.shutdown()
 
 
 @app.get("/health")

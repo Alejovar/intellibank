@@ -13,9 +13,9 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from .client import get_client, get_model
+from . import mcp_client
 from .system_prompt import build_system_prompt
 from .tool_specs import OPENAI_TOOLS
-from .tools import TOOL_REGISTRY
 from ..models import ConversationTurn, SessionState
 from ..schemas.a2ui import A2UIScreen, A2UIClarification, A2UIEnvelope
 from ..schemas.chat import ChatTextResponse
@@ -64,17 +64,7 @@ def reset_history(db: Session, user_id: int) -> None:
 
 
 def _run_domain_tool(db: Session, user_id: int, name: str, tool_input: dict) -> dict:
-    fn = TOOL_REGISTRY.get(name)
-    if not fn:
-        return {"error": f"tool desconocida: {name}"}
-    try:
-        return fn(db=db, user_id=user_id, **tool_input)
-    except TypeError as e:
-        logger.exception("Argumentos invalidos para tool %s", name)
-        return {"error": f"argumentos invalidos para {name}: {e}"}
-    except Exception as e:  # noqa: BLE001
-        logger.exception("Error ejecutando tool %s", name)
-        return {"error": str(e)}
+    return mcp_client.call_domain_tool(name, user_id, tool_input)
 
 
 def _build_ui_response(name: str, tool_input: dict) -> A2UIEnvelope | None:

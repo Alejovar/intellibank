@@ -13,6 +13,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
 from app.llm.orchestrator import reset_history, run_turn
+from app.llm.tools import TOOL_REGISTRY
 from app.models import Account, ConversationTurn, CreditAccount, SessionState, User
 from app.routers.actions import execute_action
 from app.schemas.chat import ActionExecuteRequest
@@ -70,8 +71,18 @@ class BackendHardeningTest(unittest.TestCase):
         )
         self.db.add(self.credit)
         self.db.commit()
+        self.domain_tool_patcher = patch(
+            "app.llm.orchestrator.mcp_client.call_domain_tool",
+            side_effect=lambda name, user_id, arguments: TOOL_REGISTRY[name](
+                db=self.db,
+                user_id=user_id,
+                **arguments,
+            ),
+        )
+        self.domain_tool_patcher.start()
 
     def tearDown(self):
+        self.domain_tool_patcher.stop()
         self.db.close()
         self.engine.dispose()
         os.unlink(self.db_path)

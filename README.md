@@ -63,14 +63,18 @@ archivos nuevos de la maquina de estados.
   cerrado de 11 componentes, y solo entonces se manda al cliente envuelto
   como `{ mime_type: "application/a2ui+json", payload: {...} }`. El frontend
   jamas intenta parsear texto libre.
-- **Loop de tools de dominio**: 16 funciones Python deterministas (saldo,
+- **Loop de tools de dominio**: 26 funciones Python deterministas (saldo,
   movimientos, reestructura de credito, amortizacion, inversiones, limites de
   gasto, pagos programados, gastos compartidos) que el LLM llama para obtener
-  datos reales antes de decidir que UI mostrar. Nunca inventa cifras.
+  datos reales antes de decidir que UI mostrar. El LLM elige la tool mediante
+  function-calling nativo de OpenAI, pero su ejecucion cruza un cliente/servidor
+  MCP real por stdio y ocurre en un proceso separado contra SQLite. Nunca
+  inventa cifras. Las tools `emit_screen` / `emit_clarification` permanecen
+  locales porque son el protocolo de emision de UI de la app.
 - **Acciones = tool calls reales**: un click en un boton/slider/opcion de una
-  pantalla generada llega a `POST /actions/execute`, se ejecuta como Python
-  puro contra SQLite, y el resultado se reinyecta a la conversacion para que
-  el LLM decida el siguiente paso (nunca es un mensaje de chat nuevo).
+  pantalla generada llega a `POST /actions/execute`, se ejecuta por la misma
+  ruta MCP contra SQLite, y el resultado se reinyecta a la conversacion para
+  que el LLM decida el siguiente paso (nunca es un mensaje de chat nuevo).
 - **Los 3 flujos de las imagenes de referencia**, funcionando de extremo a
   extremo con datos sinteticos:
   1. **Credito inteligente**: intencion ambigua ("quiero pagar menos
@@ -104,6 +108,7 @@ archivos nuevos de la maquina de estados.
 backend/
   app/
     main.py                 FastAPI app, CORS, seed al iniciar
+    mcp_server.py           Servidor MCP stdio; ejecuta tools de dominio contra SQLite
     models.py                SQLAlchemy (datos 100% sinteticos)
     seed.py                   Carga datos demo si la DB esta vacia
     auth.py                    Login simple (clave + password) -> token
@@ -116,6 +121,7 @@ backend/
       tools.py                  Logica de negocio real (SQLite)
       system_prompt.py          Instrucciones de orquestacion/guia
       client.py                 Wrapper del SDK de OpenAI
+      mcp_client.py             Cliente MCP persistente (thread + subprocess stdio)
       orchestrator.py          *** Loop de tool-use + validacion A2UI ***
     routers/
       auth.py, chat.py, actions.py
