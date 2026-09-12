@@ -2,8 +2,8 @@ fastapi==0.115.0
 starlette==0.38.6
 uvicorn[standard]==0.30.6
 sqlalchemy==2.0.35
-pydantic==2.9.2
-pydantic-settings==2.5.2
+pydantic
+pydantic-settings
 openai==1.109.1
 python-dotenv==1.0.1
 python-multipart==0.0.9

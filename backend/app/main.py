@@ -19,7 +19,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
+    allow_origins=["*"], # <- Cambio crítico aquí
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -42,7 +42,7 @@ def health():
     return {"status": "ok"}
 
 
-app.include_router(auth.router)
-app.include_router(chat.router)
-app.include_router(actions.router)
-app.include_router(accounts.router)
+app.include_router(auth.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
+app.include_router(actions.router, prefix="/api")
+app.include_router(accounts.router, prefix="/api")

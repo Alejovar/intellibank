@@ -1,5 +1,8 @@
 {
-  "appId": "com.example.app",
+  "appId": "com.banorte.hackmty",
   "appName": "banorte-ai-frontend",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "cleartext": true
+  }
 }
