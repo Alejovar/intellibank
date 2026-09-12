@@ -124,6 +124,45 @@ _INVESTMENT_PRODUCTS = {
     ],
 }
 
+_FIXED_INCOME_PRODUCTS = {
+    "renta_fija": [
+        {"id": "pagare_28", "title": "Pagare Banorte 28 dias", "issuer": "Banorte", "termMonths": 1, "rate": 9.1},
+        {"id": "pagare_90", "title": "Pagare Banorte 90 dias", "issuer": "Banorte", "termMonths": 3, "rate": 9.5},
+        {"id": "cede_180", "title": "CEDE Banorte 180 dias", "issuer": "Banorte", "termMonths": 6, "rate": 9.9},
+    ],
+    "deuda": [
+        {"id": "cetes_28", "title": "CETES 28 dias", "issuer": "Gobierno de Mexico", "termMonths": 1, "rate": 9.3},
+        {"id": "cetes_182", "title": "CETES 182 dias", "issuer": "Gobierno de Mexico", "termMonths": 6, "rate": 9.7},
+        {"id": "bono_m_36", "title": "Bono M 3 anos", "issuer": "Gobierno de Mexico", "termMonths": 36, "rate": 10.1},
+    ],
+}
+
+_INVESTMENT_FUNDS = [
+    {"id": "fondo_acciones_mexico", "title": "Fondo Acciones Mexico", "category": "renta_variable", "historicalAnnualReturn": 14.2, "riskLevel": "alto", "minimumInvestment": 5000.0, "description": "Canasta diversificada de empresas mexicanas."},
+    {"id": "fondo_acciones_global", "title": "Fondo Acciones Global", "category": "renta_variable", "historicalAnnualReturn": 15.8, "riskLevel": "alto", "minimumInvestment": 10000.0, "description": "Exposicion diversificada a mercados internacionales."},
+    {"id": "fondo_deuda_corto", "title": "Fondo Deuda Corto Plazo", "category": "renta_fija", "historicalAnnualReturn": 9.6, "riskLevel": "bajo", "minimumInvestment": 1000.0, "description": "Instrumentos de deuda de corta duracion."},
+    {"id": "fondo_balanceado", "title": "Fondo Balanceado Plus", "category": "balanceado", "historicalAnnualReturn": 12.4, "riskLevel": "medio", "minimumInvestment": 5000.0, "description": "Mezcla de deuda y renta variable para diversificar."},
+]
+
+_STRUCTURED_NOTES = [
+    {"id": "nota_sp500_12", "title": "Nota Protegida S&P 500", "underlying": "S&P 500", "capitalProtectionPct": 90.0, "potentialReturnMin": 6.0, "potentialReturnMax": 14.0, "termMonths": 12},
+    {"id": "nota_ipc_18", "title": "Nota Digital IPC", "underlying": "S&P/BMV IPC", "capitalProtectionPct": 85.0, "potentialReturnMin": 7.0, "potentialReturnMax": 16.0, "termMonths": 18},
+    {"id": "nota_usdmxn_6", "title": "Nota Rango USD/MXN", "underlying": "USD/MXN", "capitalProtectionPct": 100.0, "potentialReturnMin": 5.0, "potentialReturnMax": 10.5, "termMonths": 6},
+]
+
+_MARKET_WATCHLIST = [
+    {"symbol": "NAFTRAC.MX", "name": "ETF indice mexicano", "price": 58.42, "changePct": 0.64, "currency": "MXN"},
+    {"symbol": "FEMSAUBD.MX", "name": "FEMSA", "price": 198.35, "changePct": -0.41, "currency": "MXN"},
+    {"symbol": "IVV", "name": "iShares Core S&P 500 ETF", "price": 592.18, "changePct": 0.82, "currency": "USD"},
+    {"symbol": "AAPL", "name": "Apple Inc.", "price": 226.74, "changePct": -0.18, "currency": "USD"},
+]
+
+_FX_RATES = [
+    {"symbol": "USD/MXN", "name": "Dolar estadounidense / Peso mexicano", "price": 19.86, "rate": 19.86, "changePct": 0.22, "currency": "MXN"},
+    {"symbol": "EUR/MXN", "name": "Euro / Peso mexicano", "price": 21.74, "rate": 21.74, "changePct": -0.16, "currency": "MXN"},
+    {"symbol": "USD/EUR", "name": "Dolar estadounidense / Euro", "price": 0.9135, "rate": 0.9135, "changePct": 0.08, "currency": "EUR"},
+]
+
 
 def get_investment_options(db: Session, user_id: int, amount: float,
                             risk_profile: str = "conservador") -> dict:
@@ -134,6 +173,14 @@ def get_investment_options(db: Session, user_id: int, amount: float,
 def simulate_investment(db: Session, user_id: int, product_id: str, amount: float,
                          term_months: int) -> dict:
     all_products = {p["id"]: p for lst in _INVESTMENT_PRODUCTS.values() for p in lst}
+    all_products.update({
+        p["id"]: {"id": p["id"], "title": p["title"], "rate": p["historicalAnnualReturn"]}
+        for p in _INVESTMENT_FUNDS
+    })
+    all_products.update({
+        p["id"]: {"id": p["id"], "title": p["title"], "rate": p["potentialReturnMax"]}
+        for p in _STRUCTURED_NOTES
+    })
     product = all_products.get(product_id)
     if not product:
         return {"error": "producto no encontrado"}
@@ -153,14 +200,193 @@ def simulate_investment(db: Session, user_id: int, product_id: str, amount: floa
 
 
 def confirm_investment(db: Session, user_id: int, product_id: str, product_title: str,
-                        amount: float, term_months: int, rate: float) -> dict:
+                        amount: float, term_months: int, rate: float,
+                        category: str = "general", details: dict | None = None) -> dict:
     inv = Investment(
         user_id=user_id, product=product_title, amount=amount,
         term_months=term_months, estimated_rate=rate, status="activo",
+        category=category, details=details,
     )
     db.add(inv)
     db.commit()
     return {"confirmed": True, "investmentId": inv.id}
+
+
+def get_portfolio_overview(db: Session, user_id: int) -> dict:
+    account = db.query(Account).filter(Account.user_id == user_id).first()
+    investments = db.query(Investment).filter(Investment.user_id == user_id).all()
+    subtotals: dict[str, float] = {}
+    for investment in investments:
+        category = investment.category or "general"
+        subtotals[category] = subtotals.get(category, 0.0) + (investment.amount or 0.0)
+    invested_total = round(sum(subtotals.values()), 2)
+    cash = round(account.balance, 2) if account else 0.0
+    portfolio_total = round(cash + invested_total, 2)
+    colors = ["#C2002E", "#2D6FE0", "#8B5CF6", "#2E8B57", "#D97706", "#64748B", "#DB2777", "#0891B2"]
+    chart_data = []
+    for index, (category, subtotal) in enumerate(sorted(subtotals.items())):
+        chart_data.append({
+            "label": category.replace("_", " ").title(), "value": round(subtotal, 2),
+            "pct": round(subtotal / invested_total * 100, 1) if invested_total else 0.0,
+            "color": colors[index % len(colors)], "category": category,
+        })
+    return {
+        "accountLabel": account.label if account else "Cuenta principal",
+        "maskedNumber": account.masked_number if account else "",
+        "currency": account.currency if account else "MXN", "cashBalance": cash,
+        "investedTotal": invested_total, "portfolioTotal": portfolio_total,
+        "investmentCount": len(investments), "categories": chart_data,
+        "chartData": chart_data,
+    }
+
+
+def get_fixed_income_products(db: Session, user_id: int, category: str) -> dict:
+    products = _FIXED_INCOME_PRODUCTS.get(category)
+    if products is None:
+        return {"error": "categoria invalida; usa renta_fija o deuda"}
+    return {"category": category, "products": [{
+        **product,
+        "subtitle": f'{product["issuer"]} · {product["termMonths"]} meses',
+        "badge": f'{product["rate"]}% anual',
+    } for product in products]}
+
+
+def simulate_fixed_income(db: Session, user_id: int, product_id: str,
+                          category: str, amount: float, term_months: int) -> dict:
+    products = _FIXED_INCOME_PRODUCTS.get(category)
+    if products is None:
+        return {"error": "categoria invalida; usa renta_fija o deuda"}
+    product = next((p for p in products if p["id"] == product_id), None)
+    if not product:
+        return {"error": "producto no encontrado"}
+    if amount <= 0 or term_months <= 0:
+        return {"error": "monto y plazo deben ser mayores a cero"}
+    monthly_rate = product["rate"] / 100 / 12
+    curve = []
+    for month in range(0, term_months + 1, max(1, term_months // 6)):
+        curve.append({"x": month, "y": round(amount * ((1 + monthly_rate) ** month), 2)})
+    final_value = round(amount * ((1 + monthly_rate) ** term_months), 2)
+    return {
+        "productId": product_id, "productTitle": product["title"], "category": category,
+        "rate": product["rate"], "amount": amount, "termMonths": term_months,
+        "finalValue": final_value, "gainPct": round((final_value / amount - 1) * 100, 1),
+        "curve": curve,
+    }
+
+
+def get_investment_funds(db: Session, user_id: int, category: str | None = None) -> dict:
+    allowed = {"renta_variable", "renta_fija", "balanceado"}
+    if category is not None and category not in allowed:
+        return {"error": "categoria de fondo invalida"}
+    funds = [fund for fund in _INVESTMENT_FUNDS if category is None or fund["category"] == category]
+    return {"category": category, "funds": [{
+        **fund,
+        "subtitle": f'{fund["description"]} Minimo ${fund["minimumInvestment"]:,.0f} MXN',
+        "badge": f'{fund["historicalAnnualReturn"]}% hist. · riesgo {fund["riskLevel"]}',
+    } for fund in funds]}
+
+
+def get_market_watchlist(db: Session, user_id: int) -> dict:
+    return {"title": "Mercado demo", "items": [dict(item) for item in _MARKET_WATCHLIST],
+            "asOf": "Datos sinteticos para demostracion"}
+
+
+def buy_market_position(db: Session, user_id: int, symbol: str,
+                        quantity: float, price: float) -> dict:
+    if quantity <= 0 or price <= 0:
+        return {"error": "cantidad y precio deben ser mayores a cero"}
+    market_item = next((item for item in _MARKET_WATCHLIST if item["symbol"].upper() == symbol.upper()), None)
+    normalized_symbol = market_item["symbol"] if market_item else symbol.upper()
+    amount = round(quantity * price, 2)
+    inv = Investment(
+        user_id=user_id, product=normalized_symbol, amount=amount, term_months=None,
+        estimated_rate=None, status="activo", category="mercado",
+        details={"symbol": normalized_symbol, "quantity": quantity, "price": price},
+    )
+    db.add(inv)
+    db.commit()
+    return {
+        "confirmed": True, "investmentId": inv.id, "symbol": normalized_symbol,
+        "quantity": quantity, "price": price, "amount": amount,
+    }
+
+
+def get_market_positions(db: Session, user_id: int) -> dict:
+    prices = {item["symbol"]: item for item in _MARKET_WATCHLIST}
+    investments = db.query(Investment).filter(
+        Investment.user_id == user_id, Investment.category == "mercado"
+    ).order_by(Investment.id).all()
+    positions = []
+    for investment in investments:
+        details = investment.details or {}
+        symbol = details.get("symbol", investment.product)
+        quantity = details.get("quantity", 0)
+        purchase_price = details.get("price", 0)
+        current_price = prices.get(symbol, {}).get("price", purchase_price)
+        current_value = round(quantity * current_price, 2)
+        gain_loss = round(current_value - (investment.amount or 0), 2)
+        positions.append({
+            "id": investment.id, "symbol": symbol,
+            "name": prices.get(symbol, {}).get("name", investment.product),
+            "quantity": quantity, "purchasePrice": purchase_price,
+            "currentPrice": current_price, "currentValue": current_value,
+            "gainLoss": gain_loss, "currency": prices.get(symbol, {}).get("currency"),
+            "title": symbol, "subtitle": f'{quantity:g} titulos · valor ${current_value:,.2f}',
+            "badge": f'{gain_loss:+,.2f}',
+        })
+    return {"positions": positions, "totalCurrentValue": round(sum(p["currentValue"] for p in positions), 2)}
+
+
+def get_fx_rates(db: Session, user_id: int) -> dict:
+    return {"title": "Tipos de cambio demo", "items": [dict(item) for item in _FX_RATES],
+            "asOf": "Datos sinteticos para demostracion"}
+
+
+def quote_fx_exchange(db: Session, user_id: int, from_currency: str,
+                      to_currency: str, amount: float) -> dict:
+    if amount <= 0:
+        return {"error": "el monto debe ser mayor a cero"}
+    from_code, to_code = from_currency.upper(), to_currency.upper()
+    direct = next((item for item in _FX_RATES if item["symbol"] == f"{from_code}/{to_code}"), None)
+    inverse = next((item for item in _FX_RATES if item["symbol"] == f"{to_code}/{from_code}"), None)
+    if direct:
+        rate = direct["rate"]
+    elif inverse:
+        rate = 1 / inverse["rate"]
+    else:
+        return {"error": "par de divisas no disponible"}
+    converted = round(amount * rate, 2)
+    return {
+        "fromCurrency": from_code, "toCurrency": to_code, "amount": amount,
+        "rate": round(rate, 6), "convertedAmount": converted,
+        "note": "Tipo de cambio sintetico para demostracion; no es una cotizacion en tiempo real.",
+    }
+
+
+def confirm_fx_exchange(db: Session, user_id: int, from_currency: str,
+                        to_currency: str, amount: float, rate: float,
+                        converted_amount: float) -> dict:
+    if amount <= 0 or rate <= 0 or converted_amount <= 0:
+        return {"error": "monto, tasa y monto convertido deben ser mayores a cero"}
+    from_code, to_code = from_currency.upper(), to_currency.upper()
+    details = {"fromCurrency": from_code, "toCurrency": to_code,
+               "rate": rate, "convertedAmount": converted_amount}
+    inv = Investment(
+        user_id=user_id, product=f"{from_code}/{to_code}", amount=amount,
+        term_months=None, estimated_rate=None, status="activo", category="divisas",
+        details=details,
+    )
+    db.add(inv)
+    db.commit()
+    return {"confirmed": True, "investmentId": inv.id, **details, "amount": amount}
+
+
+def get_structured_notes(db: Session, user_id: int) -> dict:
+    return {"notes": [{
+        **note,
+        "subtitle": f'{note["underlying"]} · {note["termMonths"]} meses · proteccion {note["capitalProtectionPct"]}%',
+        "badge": f'{note["potentialReturnMin"]}-{note["potentialReturnMax"]}% potencial',
+    } for note in _STRUCTURED_NOTES]}
 
 
 # ---------------------------------------------------------------- seguros
@@ -333,7 +559,8 @@ def get_financial_diagnosis(db: Session, user_id: int) -> dict:
 
 
 def set_financial_goal(db: Session, user_id: int, goal_name: str,
-                       target_amount: float, target_date: str) -> dict:
+                       target_amount: float, target_date: str,
+                       term: str | None = None) -> dict:
     if target_amount <= 0:
         return {"error": "la meta debe ser mayor a cero"}
     try:
@@ -342,14 +569,14 @@ def set_financial_goal(db: Session, user_id: int, goal_name: str,
         return {"error": "fecha objetivo invalida; usa YYYY-MM-DD"}
     goal = FinancialGoal(
         user_id=user_id, name=goal_name, target_amount=round(target_amount, 2),
-        target_date=parsed_date, saved_amount=0.0,
+        target_date=parsed_date, saved_amount=0.0, term=term,
     )
     db.add(goal)
     db.commit()
     return {
         "goalId": goal.id, "name": goal.name, "targetAmount": goal.target_amount,
         "targetDate": goal.target_date.strftime("%Y-%m-%d"),
-        "savedAmount": goal.saved_amount, "progressPercent": 0.0,
+        "savedAmount": goal.saved_amount, "progressPercent": 0.0, "term": goal.term,
     }
 
 
@@ -365,6 +592,7 @@ def get_financial_goals(db: Session, user_id: int) -> dict:
             "targetAmount": goal.target_amount, "savedAmount": goal.saved_amount,
             "targetDate": goal.target_date.strftime("%Y-%m-%d"),
             "progressPercent": round(goal.saved_amount / goal.target_amount * 100, 1),
+            "term": goal.term,
         }
         for goal in goals
     ]}
@@ -549,6 +777,17 @@ TOOL_REGISTRY = {
     "get_investment_options": get_investment_options,
     "simulate_investment": simulate_investment,
     "confirm_investment": confirm_investment,
+    "get_portfolio_overview": get_portfolio_overview,
+    "get_fixed_income_products": get_fixed_income_products,
+    "simulate_fixed_income": simulate_fixed_income,
+    "get_investment_funds": get_investment_funds,
+    "get_market_watchlist": get_market_watchlist,
+    "buy_market_position": buy_market_position,
+    "get_market_positions": get_market_positions,
+    "get_fx_rates": get_fx_rates,
+    "quote_fx_exchange": quote_fx_exchange,
+    "confirm_fx_exchange": confirm_fx_exchange,
+    "get_structured_notes": get_structured_notes,
     "get_insurance_products": get_insurance_products,
     "quote_insurance": quote_insurance,
     "confirm_insurance_policy": confirm_insurance_policy,

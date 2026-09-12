@@ -100,6 +100,9 @@ class Investment(Base):
     term_months = Column(Integer)
     estimated_rate = Column(Float)
     status = Column(String, default="simulado")  # simulado | activo
+    category = Column(String, nullable=True)  # general | renta_fija | deuda | ...
+    details = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 class InsurancePolicy(Base):
@@ -131,6 +134,7 @@ class FinancialGoal(Base):
     target_amount = Column(Float)
     target_date = Column(DateTime)
     saved_amount = Column(Float, default=0.0)
+    term = Column(String, nullable=True)  # corto | mediano | largo
     created_at = Column(DateTime, default=datetime.utcnow)
 
 

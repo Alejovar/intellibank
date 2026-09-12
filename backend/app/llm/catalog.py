@@ -63,6 +63,18 @@ CATALOGO CERRADO DE COMPONENTES (usa EXACTAMENTE estos nombres en "component"):
     props: { text }
     Uso: texto simple cuando ningun otro componente aplica (usar con moderacion).
 
+12. MarketWatchlist
+    props: { title?, items: [{ symbol, name, price, changePct, currency? }] }
+    actions: al seleccionar una fila manda { symbol } como arg dinamico.
+    Uso: listas compactas de precios sinteticos para acciones, ETFs y pares de divisas;
+    muestra variaciones positivas en verde y negativas en rojo.
+
+13. CurrencyExchangeCard
+    props: { fromCurrency, toCurrency, amount, rate, convertedAmount, note? }
+    actions: la primera accion confirma el cambio y recibe dinamicamente
+    { from_currency, to_currency, amount, rate, converted_amount }.
+    Uso: mostrar una cotizacion de divisas y su boton "Confirmar cambio".
+
 REGLAS DE COMPOSICION:
 - Una pantalla (A2UIScreen) puede combinar 1 a 4 componentes en layout "stack" (vertical)
   o "grid".

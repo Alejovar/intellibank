@@ -34,6 +34,8 @@ COMPONENT_CATALOG = {
     "SuccessScreen",
     "InfoBanner",
     "TextBlock",
+    "MarketWatchlist",
+    "CurrencyExchangeCard",
 }
 
 

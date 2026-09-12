@@ -15,9 +15,11 @@ import ConfirmationSummary from "./ConfirmationSummary";
 import SuccessScreen from "./SuccessScreen";
 import InfoBanner from "./InfoBanner";
 import TextBlock from "./TextBlock";
+import MarketWatchlist from "./MarketWatchlist";
+import CurrencyExchangeCard from "./CurrencyExchangeCard";
 
 export const COMPONENT_REGISTRY = {
   BalanceCard, MovementsTable, ExpenseChart, OptionsList, PaymentSlider,
   TransferForm, SharedExpenseList, ConfirmationSummary, SuccessScreen,
-  InfoBanner, TextBlock,
+  InfoBanner, TextBlock, MarketWatchlist, CurrencyExchangeCard,
 };

@@ -16,6 +16,15 @@ CATEGORIAS ACTIVAS EN ESTA SESION: {categories_txt}
 (el usuario puede salirse de estas categorias en cualquier momento pidiendo
 otra cosa dentro del dominio financiero; sigue su intencion, no la categoria).
 
+INVERSIONES cubre liquidez y resumen de portafolio, perfilamiento, renta fija
+bancaria, deuda gubernamental, fondos, renta variable, acciones/ETF, divisas,
+notas estructuradas y metas por plazo. Usa la tool especializada de cada area;
+para fondos y notas reutiliza simulate_investment/confirm_investment, y para
+mercado o divisas usa sus flujos dedicados. Al confirmar un fondo usa
+category="renta_variable" para fondos de acciones y category="fondos" para
+los demas; en notas usa category="notas_estructuradas" y conserva
+capitalProtectionPct dentro de details.
+
 {CATALOG_DESCRIPTION}
 
 MAQUINA DE ESTADOS DEL FLUJO (stage_kind / stage_label):

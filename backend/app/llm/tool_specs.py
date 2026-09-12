@@ -103,9 +103,109 @@ DOMAIN_TOOLS = [
                 "amount": {"type": "number"},
                 "term_months": {"type": "integer"},
                 "rate": {"type": "number"},
+                "category": {"type": "string", "default": "general"},
+                "details": {"type": "object"},
             },
             "required": ["product_id", "product_title", "amount", "term_months", "rate"],
         },
+    },
+    {
+        "name": "get_portfolio_overview",
+        "description": "Obtiene liquidez y portafolio total, agrupando inversiones por categoria. Usar para resumen, que tengo invertido o asignacion.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_fixed_income_products",
+        "description": "Lista productos sinteticos de renta fija bancaria o deuda gubernamental.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"category": {"type": "string", "enum": ["renta_fija", "deuda"]}},
+            "required": ["category"],
+        },
+    },
+    {
+        "name": "simulate_fixed_income",
+        "description": "Simula crecimiento compuesto de un producto de renta fija o deuda.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "product_id": {"type": "string"},
+                "category": {"type": "string", "enum": ["renta_fija", "deuda"]},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+                "term_months": {"type": "integer", "minimum": 1},
+            },
+            "required": ["product_id", "category", "amount", "term_months"],
+        },
+    },
+    {
+        "name": "get_investment_funds",
+        "description": "Permite explorar un catalogo detallado de fondos por categoria, rendimiento historico, riesgo y minimo.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"category": {"type": "string", "enum": ["renta_variable", "renta_fija", "balanceado"]}},
+            "required": [],
+        },
+    },
+    {
+        "name": "get_market_watchlist",
+        "description": "Obtiene precios sinteticos demo de acciones y ETFs mexicanos y estadounidenses.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "buy_market_position",
+        "description": "Compra y registra una posicion de mercado por cantidad y precio, tras confirmacion del usuario.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "symbol": {"type": "string"},
+                "quantity": {"type": "number", "exclusiveMinimum": 0},
+                "price": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": ["symbol", "quantity", "price"],
+        },
+    },
+    {
+        "name": "get_market_positions",
+        "description": "Lista posiciones de acciones/ETF del usuario valuadas con la watchlist sintetica actual.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_fx_rates",
+        "description": "Obtiene tipos de cambio sinteticos demo para pares USD/MXN, EUR/MXN y USD/EUR.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "quote_fx_exchange",
+        "description": "Cotiza una conversion de divisas usando la tasa sintetica disponible, sin persistirla.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "from_currency": {"type": "string"},
+                "to_currency": {"type": "string"},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": ["from_currency", "to_currency", "amount"],
+        },
+    },
+    {
+        "name": "confirm_fx_exchange",
+        "description": "Confirma y registra un cambio de divisas previamente cotizado.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "from_currency": {"type": "string"},
+                "to_currency": {"type": "string"},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+                "rate": {"type": "number", "exclusiveMinimum": 0},
+                "converted_amount": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": ["from_currency", "to_currency", "amount", "rate", "converted_amount"],
+        },
+    },
+    {
+        "name": "get_structured_notes",
+        "description": "Lista notas estructuradas sinteticas con subyacente, proteccion, retorno potencial y plazo.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
         "name": "get_insurance_products",
@@ -169,13 +269,14 @@ DOMAIN_TOOLS = [
                 "goal_name": {"type": "string"},
                 "target_amount": {"type": "number", "exclusiveMinimum": 0},
                 "target_date": {"type": "string", "description": "ISO date YYYY-MM-DD"},
+                "term": {"type": "string", "enum": ["corto", "mediano", "largo"]},
             },
             "required": ["goal_name", "target_amount", "target_date"],
         },
     },
     {
         "name": "get_financial_goals",
-        "description": "Lista las metas financieras del usuario con monto ahorrado y porcentaje de avance.",
+        "description": "Lista las metas financieras del usuario con plazo, monto ahorrado y porcentaje de avance.",
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
@@ -303,6 +404,7 @@ _COMPONENT_SCHEMA = {
                 "BalanceCard", "MovementsTable", "ExpenseChart", "OptionsList",
                 "PaymentSlider", "TransferForm", "SharedExpenseList",
                 "ConfirmationSummary", "SuccessScreen", "InfoBanner", "TextBlock",
+                "MarketWatchlist", "CurrencyExchangeCard",
             ],
         },
         "props": {"type": "object"},

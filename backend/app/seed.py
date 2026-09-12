@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 import hashlib
 from .database import SessionLocal, engine, Base
 from .models import (
-    User, Account, Movement, CreditAccount, ExpenseLimit, InvestmentProfile
+    User, Account, Movement, CreditAccount, ExpenseLimit, InvestmentProfile,
+    Investment,
 )
 
 
@@ -82,6 +83,19 @@ def seed_if_empty():
         ))
 
         db.add(InvestmentProfile(user_id=user.id, risk_profile=None))
+
+        db.add_all([
+            Investment(
+                user_id=user.id, product="Pagare Banorte 90 dias", amount=15000.0,
+                term_months=3, estimated_rate=9.5, status="activo",
+                category="renta_fija", details={"issuer": "Banorte"},
+            ),
+            Investment(
+                user_id=user.id, product="Fondo Balanceado Plus", amount=10000.0,
+                term_months=12, estimated_rate=12.4, status="activo",
+                category="fondos", details={"riskLevel": "medio"},
+            ),
+        ])
 
         db.commit()
     finally:
