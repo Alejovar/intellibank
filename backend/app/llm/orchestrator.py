@@ -25,11 +25,11 @@ logger = logging.getLogger("banorte.orchestrator")
 MAX_TOOL_ITERATIONS = 6
 
 ALLOWED_STAGE_TRANSITIONS = {
-    "idle": {"intent", "generated"},
-    "intent": {"intent", "generated"},
+    "idle": {"intent", "generated", "result"},
+    "intent": {"intent", "generated", "result"},
     "generated": {"intent", "generated", "interaction", "confirmation", "result"},
-    "interaction": {"intent", "interaction", "confirmation", "result"},
-    "confirmation": {"intent", "interaction", "result"},
+    "interaction": {"intent", "generated", "interaction", "confirmation", "result"},
+    "confirmation": {"intent", "generated", "interaction", "result"},
     "result": {"intent", "generated"},
 }
 # "intent" (pedir una aclaracion) es un destino valido desde CUALQUIER estado:
