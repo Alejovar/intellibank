@@ -1,6 +1,6 @@
 import { useAppStore } from "../store/useAppStore";
 
-const BASE = "/api";
+const BASE = "http://10.22.96.173:8000/api";
 
 function authHeaders() {
   const token = localStorage.getItem("banorte_token");
