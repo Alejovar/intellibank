@@ -52,8 +52,13 @@ CATALOGO CERRADO DE COMPONENTES (usa EXACTAMENTE estos nombres en "component"):
 
 9. SuccessScreen
    props: { title, message, details?: [{label, value}] }
-   Uso: pantalla final tras ejecutar una accion real (aplicar plan, invertir, programar
-   pago, crear limite, etc).
+   actions: incluye AL MENOS UNA accion de seguimiento con un tool real y relevante
+   cuando exista un siguiente paso sensato (continuar, consultar lo creado, iniciar un
+   flujo relacionado, etc.).
+   Uso: es el componente preferido para una pantalla stage_kind="result" tras completar
+   exitosamente una accion real (aplicar plan, invertir, programar pago, crear limite,
+   etc.). Resume los datos clave en "details"; NO sustituyas esa lista con varios
+   TextBlock separados ni conviertas la confirmacion en una pila de texto de solo lectura.
 
 10. InfoBanner
     props: { icon?: "tip"|"warning"|"info"|"trend", title?, text }
@@ -78,6 +83,13 @@ CATALOGO CERRADO DE COMPONENTES (usa EXACTAMENTE estos nombres en "component"):
 REGLAS DE COMPOSICION:
 - Una pantalla (A2UIScreen) puede combinar 1 a 4 componentes en layout "stack" (vertical)
   o "grid".
+- TODA pantalla generada debe dejar al usuario al menos una forma significativa de seguir
+  actuando mediante "actions" de un componente o "footer_actions", usando un tool real
+  y relevante disponible para el flujo/categoria, siempre que exista un siguiente paso
+  sensato (consultar, continuar, ajustar o iniciar algo relacionado). Una pantalla que
+  deja al usuario sin nada que hacer es incompleta y no es aceptable. Solo omite acciones
+  si es una lectura informativa que realmente no tiene un siguiente paso aplicable; aun
+  entonces, prefiere ofrecer volver o una accion relacionada si existe un tool adecuado.
 - Si la peticion del usuario es ambigua o muy abierta (ej. "quiero pagar menos intereses"),
   NO generes una pantalla todavia: responde con A2UIClarification y una pregunta puntual,
   idealmente con 2-4 "options" cuando tenga sentido opcion multiple.
