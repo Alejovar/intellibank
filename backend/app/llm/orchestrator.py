@@ -24,6 +24,11 @@ logger = logging.getLogger("banorte.orchestrator")
 
 MAX_TOOL_ITERATIONS = 6
 
+
+def _normalize_tool_name(name: str) -> str:
+    return name.removeprefix("functions.")
+
+
 ALLOWED_STAGE_TRANSITIONS = {
     "idle": {"intent", "generated", "result"},
     "intent": {"intent", "generated", "result"},
@@ -198,17 +203,20 @@ def run_turn(
 
         message = response.choices[0].message
         tool_calls = message.tool_calls or []
+        normalized_tool_calls = [
+            (tc, _normalize_tool_name(tc.function.name)) for tc in tool_calls
+        ]
 
-        # Guardamos la respuesta del asistente tal cual (puede tener texto y/o tool_calls)
+        # Guardamos la respuesta del asistente con nombres de tools normalizados.
         assistant_entry = {"role": "assistant", "content": message.content}
         if tool_calls:
             assistant_entry["tool_calls"] = [
                 {
                     "id": tc.id,
                     "type": "function",
-                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                    "function": {"name": name, "arguments": tc.function.arguments},
                 }
-                for tc in tool_calls
+                for tc, name in normalized_tool_calls
             ]
         _append_history(db, user_id, assistant_entry)
         history.append(assistant_entry)
@@ -219,12 +227,23 @@ def run_turn(
             return ChatTextResponse(payload=text)
 
         # Puede haber una tool de UI y/o varias tools de datos en la misma vuelta.
-        ui_call = next((tc for tc in tool_calls if tc.function.name in ("emit_screen", "emit_clarification")), None)
-        domain_calls = [tc for tc in tool_calls if tc.function.name not in ("emit_screen", "emit_clarification")]
+        ui_call = next(
+            (
+                (tc, name)
+                for tc, name in normalized_tool_calls
+                if name in ("emit_screen", "emit_clarification")
+            ),
+            None,
+        )
+        domain_calls = [
+            (tc, name)
+            for tc, name in normalized_tool_calls
+            if name not in ("emit_screen", "emit_clarification")
+        ]
 
-        for tc in domain_calls:
+        for tc, name in domain_calls:
             tool_input = json.loads(tc.function.arguments or "{}")
-            result = _run_domain_tool(db, user_id, tc.function.name, tool_input)
+            result = _run_domain_tool(db, user_id, name, tool_input)
             tool_entry = {
                 "role": "tool",
                 "tool_call_id": tc.id,
@@ -234,13 +253,14 @@ def run_turn(
             history.append(tool_entry)
 
         if ui_call:
-            tool_input = json.loads(ui_call.function.arguments or "{}")
-            envelope = _build_ui_response(ui_call.function.name, tool_input)
+            ui_tc, ui_name = ui_call
+            tool_input = json.loads(ui_tc.function.arguments or "{}")
+            envelope = _build_ui_response(ui_name, tool_input)
             accepted = envelope is not None and _accept_ui_transition(db, user_id, envelope)
             # Cerramos el tool_call con un ack para mantener el historial valido
             tool_entry = {
                 "role": "tool",
-                "tool_call_id": ui_call.id,
+                "tool_call_id": ui_tc.id,
                 "content": json.dumps({"delivered": accepted}),
             }
             _append_history(db, user_id, tool_entry)
