@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./banorte_demo.db"
     jwt_secret: str = "dev-secret-change-me"
     cors_origins: str = "http://localhost:5173"
+    webauthn_rp_id: str = "localhost"
+    webauthn_rp_name: str = "Banca AI"
+    webauthn_origin: str = "http://localhost:5173"
 
     class Config:
         env_file = ".env"

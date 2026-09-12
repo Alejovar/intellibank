@@ -4,7 +4,8 @@ del hackathon: no representan cuentas ni clientes reales de Banorte.
 """
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, JSON
+    Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Text, JSON,
+    LargeBinary,
 )
 from sqlalchemy.orm import relationship
 from .database import Base
@@ -16,6 +17,12 @@ class User(Base):
     clave_bancaria = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
+    email = Column(String, unique=True, index=True, nullable=True)
+    phone = Column(String, nullable=True)
+    card_number_hash = Column(String, unique=True, index=True, nullable=True)
+    card_last4 = Column(String, nullable=True)
+    biometric_enabled = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
     onboarding_done = Column(Boolean, default=False)
 
     accounts = relationship("Account", back_populates="owner")
@@ -156,6 +163,21 @@ class SavedScreen(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="generated_screens")
+
+
+class AuthDevice(Base):
+    """Metadata de un dispositivo; nunca guarda huellas ni rostros."""
+    __tablename__ = "auth_devices"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    platform = Column(String, nullable=False)  # ios | android | web
+    credential_id = Column(String, nullable=False, unique=True)
+    credential_public_key = Column(LargeBinary, nullable=True)
+    sign_count = Column(Integer, default=0, nullable=False)
+    transports = Column(JSON, default=list)
+    device_name = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_used_at = Column(DateTime, nullable=True)
 
 
 class ConversationTurn(Base):

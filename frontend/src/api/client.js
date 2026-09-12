@@ -35,6 +35,36 @@ export const api = {
   login: (clave_bancaria, password) =>
     request("/auth/login", { method: "POST", body: JSON.stringify({ clave_bancaria, password }) }),
 
+  register: (data) =>
+    request("/auth/register", { method: "POST", body: JSON.stringify(data) }),
+
+  enrollBiometric: (platform, credentialId, deviceName) =>
+    request("/auth/biometric/enroll", {
+      method: "POST",
+      body: JSON.stringify({ platform, credential_id: credentialId, device_name: deviceName }),
+    }),
+
+  getPasskeyRegistrationOptions: () =>
+    request("/auth/passkey/register/options", { method: "POST" }),
+
+  completePasskeyRegistration: (credential, platform = "web", deviceName = null) =>
+    request("/auth/passkey/register/complete", {
+      method: "POST",
+      body: JSON.stringify({ credential, platform, device_name: deviceName }),
+    }),
+
+  getPasskeyLoginOptions: (identifier) =>
+    request("/auth/passkey/login/options", {
+      method: "POST",
+      body: JSON.stringify({ identifier }),
+    }),
+
+  completePasskeyLogin: (identifier, credential) =>
+    request("/auth/passkey/login/complete", {
+      method: "POST",
+      body: JSON.stringify({ identifier, credential }),
+    }),
+
   completeOnboarding: () => request("/auth/onboarding-complete", { method: "POST" }),
 
   /**
