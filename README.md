@@ -97,10 +97,10 @@ archivos nuevos de la maquina de estados.
   cualquier accion irreversible siempre pasa por una `ConfirmationSummary`
   con `requires_biometric`. Asi, un pedido como "reduce lo que pago de
   credito" se va desglosando pantalla por pantalla en vez de fallar.
-- Login con clave bancaria + password, onboarding de 4 pantallas fijas,
-  seleccion de categoria con **revelacion progresiva** (no se muestran todos
-  los subtemas de una vez), input de texto + voz (Web Speech API) siempre
-  visible, y guardar/descartar al cerrar cualquier pantalla generada.
+- Login o registro con correo, telefono, CLABE o tarjeta + password,
+  onboarding de 4 pantallas fijas, temas configurables desde **Mas**, input
+  de texto + voz siempre visible, y guardar/descartar al cerrar cualquier
+  pantalla generada.
 
 ## Estructura
 
@@ -121,7 +121,7 @@ backend/
       tools.py                  Logica de negocio real (SQLite)
       system_prompt.py          Instrucciones de orquestacion/guia
       client.py                 Wrapper del SDK de OpenAI
-      mcp_client.py             Cliente MCP persistente (thread + subprocess stdio)
+      mcp_client.py             Cliente MCP persistente (thread + streams en memoria)
       orchestrator.py          *** Loop de tool-use + validacion A2UI ***
     routers/
       auth.py, chat.py, actions.py
@@ -133,8 +133,9 @@ frontend/
       A2UIRenderer.jsx          Resuelve el JSON del backend contra el catalogo
       ChatInput.jsx             Texto + microfono, siempre visible
     screens/
-      LoginScreen, OnboardingScreen (fijo), CategorySelection (progresivo),
-      AssistantScreen (chat + pantallas generadas + guardar/descartar)
+      LoginScreen, OnboardingScreen (fijo), MoreScreen (temas configurables),
+      AssistantScreen (chat + pantallas generadas + guardar/descartar),
+      SavedScreensScreen (guardadas + historial automatico)
     store/useAppStore.js        Estado global (zustand)
     api/client.js               Cliente HTTP
 ```

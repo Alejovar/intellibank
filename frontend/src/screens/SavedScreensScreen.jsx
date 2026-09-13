@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
+import A2UIRenderer from "../components/A2UIRenderer";
 import BottomNav from "../components/BottomNav";
 import ChatInput from "../components/ChatInput";
 import { Brand, StatusBar } from "../components/PhoneChrome";
@@ -27,15 +28,23 @@ function HistoryIcon({ screen }) {
 }
 
 export default function SavedScreensScreen({ onNavigate, onStartAssistant }) {
-  const [screens, setScreens] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [view, setView] = useState("saved");
+  const [savedScreens, setSavedScreens] = useState([]);
+  const [history, setHistory] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState({ saved: true, history: true });
+  const [errors, setErrors] = useState({ saved: null, history: null });
 
   useEffect(() => {
     api.listInterfaceHistory()
-      .then(setScreens)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .then(setHistory)
+      .catch((err) => setErrors((current) => ({ ...current, history: err.message })))
+      .finally(() => setLoading((current) => ({ ...current, history: false })));
+
+    api.listSavedScreens()
+      .then(setSavedScreens)
+      .catch((err) => setErrors((current) => ({ ...current, saved: err.message })))
+      .finally(() => setLoading((current) => ({ ...current, saved: false })));
   }, []);
 
   const reopenInterface = (screen) => {
@@ -43,40 +52,69 @@ export default function SavedScreensScreen({ onNavigate, onStartAssistant }) {
     onStartAssistant(prompt);
   };
 
+  const screens = view === "saved" ? savedScreens : history;
+  const isLoading = loading[view];
+  const error = errors[view];
+
   return (
     <div className="phone-shell">
       <StatusBar />
       <div className="app-header">
+        {selected && <button className="back-btn" onClick={() => setSelected(null)} aria-label="Volver a guardadas">‹</button>}
         <div>
           <Brand compact />
-          <div className="tagline history-powered">Powered by Nort<span>AI</span></div>
+          <div className="tagline history-powered">
+            {selected ? "Pantalla guardada" : <>Powered by Nort<span>AI</span></>}
+          </div>
         </div>
+        {selected && <span className="a2ui-pill" style={{ marginLeft: "auto" }}>A2UI</span>}
       </div>
 
       <main className="screen-body saved-screen">
-        <div>
-          <h1 className="screen-title">Historial</h1>
-          <p className="screen-copy">Abre una consulta anterior para que NortAI vuelva a generar la interfaz con datos actuales.</p>
-        </div>
-        {loading && <div className="dashboard-loading">Cargando historial…</div>}
-        {error && <div className="info-banner warning"><span>{error}</span></div>}
-        {!loading && !error && screens.length === 0 && (
-          <div className="saved-empty">Todavía no hay interfaces en tu historial.<br />Consulta algo desde el Asistente para crear la primera.</div>
+        {selected ? (
+          <A2UIRenderer envelope={selected.payload} />
+        ) : (
+          <>
+            <div>
+              <h1 className="screen-title">Guardadas</h1>
+              <p className="screen-copy">
+                {view === "saved"
+                  ? "Abre exactamente las interfaces que elegiste conservar."
+                  : "Repite una consulta anterior para generar la interfaz con datos actuales."}
+              </p>
+            </div>
+            <div className="saved-tabs" role="tablist" aria-label="Pantallas guardadas e historial">
+              <button type="button" role="tab" aria-selected={view === "saved"} className={view === "saved" ? "active" : ""} onClick={() => setView("saved")}>Guardadas</button>
+              <button type="button" role="tab" aria-selected={view === "history"} className={view === "history" ? "active" : ""} onClick={() => setView("history")}>Historial</button>
+            </div>
+            {isLoading && <div className="dashboard-loading">Cargando {view === "saved" ? "pantallas" : "historial"}…</div>}
+            {error && <div className="info-banner warning"><span>{error}</span></div>}
+            {!isLoading && !error && screens.length === 0 && (
+              <div className="saved-empty">
+                {view === "saved" ? (
+                  <>Todavía no tienes pantallas guardadas.<br />Puedes guardar una desde el Asistente.</>
+                ) : (
+                  <>Todavía no hay interfaces en tu historial.<br />Consulta algo desde el Asistente para crear la primera.</>
+                )}
+              </div>
+            )}
+            <div className="saved-list">
+              {screens.map((screen, index) => {
+                const generated = screen.payload?.payload;
+                const meta = generated?.stage_label || generated?.subtitle || "Interfaz generada";
+                const tint = TINTS[index % TINTS.length];
+                const open = view === "saved" ? () => setSelected(screen) : () => reopenInterface(screen);
+                return (
+                  <button key={screen.id} className="saved-row" onClick={open}>
+                    <span className="saved-icon" style={tint} aria-hidden="true"><HistoryIcon screen={screen} /></span>
+                    <span className="saved-copy"><strong>{screen.title}</strong><small>{meta}</small></span>
+                    <span className="saved-chevron">›</span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
         )}
-        <div className="saved-list">
-          {screens.map((screen, index) => {
-            const generated = screen.payload?.payload;
-            const meta = generated?.stage_label || generated?.subtitle || "Interfaz generada";
-            const tint = TINTS[index % TINTS.length];
-            return (
-              <button key={screen.id} className="saved-row" onClick={() => reopenInterface(screen)}>
-                <span className="saved-icon" style={tint} aria-hidden="true"><HistoryIcon screen={screen} /></span>
-                <span className="saved-copy"><strong>{screen.title}</strong><small>{meta}</small></span>
-                <span className="saved-chevron">›</span>
-              </button>
-            );
-          })}
-        </div>
       </main>
       <ChatInput
         onSend={(message) => onStartAssistant(message)}

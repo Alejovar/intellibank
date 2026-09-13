@@ -1,4 +1,4 @@
-"""Cliente MCP sincrono respaldado por una sesion stdio asincrona persistente."""
+"""Cliente MCP sincrono respaldado por una sesion asincrona en memoria."""
 from __future__ import annotations
 
 import asyncio

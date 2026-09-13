@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
+from app import auth as auth_module
 from app.llm import mcp_client
 from app.llm.orchestrator import reset_history, run_turn
 from app.llm.tools import TOOL_REGISTRY
@@ -298,6 +299,26 @@ db.close()
         reset_history(self.db, self.user.id)
         self.assertEqual(self.db.query(ConversationTurn).count(), 0)
         self.assertIsNone(self.db.get(SessionState, self.user.id))
+
+    def test_phone_is_a_unique_login_identifier(self):
+        self.user.phone = "5512345678"
+        self.user.password_hash = auth_module.hash_pw("password123")
+        self.db.commit()
+
+        _, logged_in = auth_module.login("55 1234 5678", "password123", self.db)
+        self.assertEqual(logged_in.id, self.user.id)
+
+        with self.assertRaises(HTTPException) as duplicate:
+            auth_module.register(
+                full_name="Otra Persona",
+                email="otra@example.com",
+                phone="5512345678",
+                password="password123",
+                clave_bancaria="123456789012345678",
+                card_number=None,
+                db=self.db,
+            )
+        self.assertEqual(duplicate.exception.status_code, 409)
 
 
 class MCPTransportTest(unittest.TestCase):

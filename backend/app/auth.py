@@ -1,5 +1,5 @@
 """
-Auth minima para demo: clave bancaria + password contra la DB sintetica.
+Auth minima para demo: identificador de cuenta + password contra la DB sintetica.
 Emite un token simple (no es JWT real, es suficiente para el hackathon;
 en produccion usar JWT firmado / OAuth interno de Banorte).
 """
@@ -50,7 +50,12 @@ def find_user(identifier: str, db: Session) -> User | None:
     user = db.query(User).filter(User.email == normalized).first()
     if user:
         return user
-    card_hash = hashlib.sha256(_normalize_card(identifier).encode()).hexdigest()
+    digits = _normalize_card(identifier)
+    if len(digits) == 10:
+        user = db.query(User).filter(User.phone == digits).first()
+        if user:
+            return user
+    card_hash = hashlib.sha256(digits.encode()).hexdigest()
     return db.query(User).filter(User.card_number_hash == card_hash).first()
 
 
@@ -64,12 +69,15 @@ def register(
     db: Session,
 ) -> User:
     normalized_email = _normalize_identifier(email)
+    normalized_phone = _normalize_card(phone)
     normalized_clave = _normalize_identifier(clave_bancaria or "")
     normalized_card = _normalize_card(card_number or "")
     if not normalized_clave and not normalized_card:
         raise HTTPException(status_code=422, detail="Debes registrar una CLABE o tarjeta")
     if db.query(User).filter(User.email == normalized_email).first():
         raise HTTPException(status_code=409, detail="El correo ya esta registrado")
+    if db.query(User).filter(User.phone == normalized_phone).first():
+        raise HTTPException(status_code=409, detail="El telefono ya esta registrado")
     if normalized_clave and db.query(User).filter(User.clave_bancaria == normalized_clave).first():
         raise HTTPException(status_code=409, detail="La CLABE ya esta registrada")
     card_hash = hashlib.sha256(normalized_card.encode()).hexdigest() if normalized_card else None
@@ -80,7 +88,7 @@ def register(
         password_hash=hash_pw(password),
         full_name=full_name.strip(),
         email=normalized_email,
-        phone=phone.strip(),
+        phone=normalized_phone,
         card_number_hash=card_hash,
         card_last4=normalized_card[-4:] if normalized_card else None,
         onboarding_done=True,

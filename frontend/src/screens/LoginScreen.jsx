@@ -176,7 +176,7 @@ export default function LoginScreen() {
     if (!biometricIdentifier) {
       setUsePassword(true);
       setEditIdentifier(true);
-      setError("Ingresa tu correo, CLABE o tarjeta para continuar");
+      setError("Ingresa tu correo, teléfono, CLABE o tarjeta para continuar");
       return;
     }
     setError(null);
@@ -327,7 +327,7 @@ export default function LoginScreen() {
               <span className="field-label">Cuenta</span>
               <input
                 autoComplete="username"
-                placeholder="Correo, CLABE o tarjeta"
+                placeholder="Correo, teléfono, CLABE o tarjeta"
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
               />
