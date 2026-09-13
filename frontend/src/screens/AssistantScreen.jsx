@@ -21,7 +21,6 @@ export default function AssistantScreen({ initialMessage, onInitialMessageConsum
 
   const [toast, setToast] = useState(null);
   const chatBodyRef = useRef(null);
-  const bottomRef = useRef(null);
   const sentInitial = useRef(false);
   const itemRefs = useRef({});
 
@@ -128,7 +127,6 @@ export default function AssistantScreen({ initialMessage, onInitialMessageConsum
         {toast && (
           <div className="info-banner tip"><span>{toast}</span></div>
         )}
-        <div ref={bottomRef} />
       </div>
 
       <ChatInput
