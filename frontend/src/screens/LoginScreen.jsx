@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api } from "../api/client";
 import { useAppStore } from "../store/useAppStore";
 import { Brand, StatusBar } from "../components/PhoneChrome";
+import { NativeBiometric } from "@capgo/capacitor-native-biometric";
 
 export default function LoginScreen() {
   const [claveBancaria, setClaveBancaria] = useState("");
@@ -24,6 +25,36 @@ export default function LoginScreen() {
     }
   };
 
+  const handleBiometricLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const result = await NativeBiometric.isAvailable();
+      if (!result.isAvailable) {
+        setError("El dispositivo no soporta biometría.");
+        setLoading(false);
+        return;
+      }
+
+      await NativeBiometric.verifyIdentity({
+        reason: "Inicia sesión con tu rostro o huella",
+        title: "Acceso Banorte",
+        subtitle: "Autenticación biométrica",
+        description: "Confirma tu identidad para acceder",
+      });
+
+      // Si la biometría es exitosa, entramos con las credenciales demo del hackathon
+      const res = await api.login("4152", "demo1234");
+      login(res.token, res.full_name, res.onboarding_done);
+    } catch (err) {
+      if (err.message && !err.message.includes("canceled")) {
+        setError("No se pudo verificar la identidad biométrica.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="phone-shell login-shell">
       <StatusBar />
@@ -34,8 +65,20 @@ export default function LoginScreen() {
       <form onSubmit={submit} className="login-content">
         <div className="login-heading">
           <h1>Iniciar sesión</h1>
-          <p>Ingresa tu CLABE interbancaria para reconocer tu cuenta.</p>
+          <p>Ingresa tu CLABE interbancaria o usa acceso rápido.</p>
         </div>
+
+        {/* Botón de acceso biométrico rápido */}
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleBiometricLogin}
+          disabled={loading}
+          style={{ marginBottom: "6px", display: "flex", gap: "8px", justifyContent: "center", alignItems: "center" }}
+        >
+          <span>🔐</span> Entrar con Huella / Rostro
+        </button>
+
         <div className="credential-card">
           <label className="field-label" htmlFor="clave-bancaria">CLABE interbancaria</label>
           <input

@@ -1,55 +1,66 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
+import { SpeechRecognition } from "@capacitor-community/speech-recognition";
+import { Capacitor } from "@capacitor/core";
 
 /**
- * Input siempre disponible debajo de la pantalla: texto + microfono.
- * Usa la Web Speech API con manejo de errores nativo para depuración en Android.
+ * Input con soporte nativo de Capacitor para Android/iOS y respaldo web.
  */
 export default function ChatInput({ onSend, disabled, navigation }) {
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef(null);
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-  const startListening = () => {
-    if (!SpeechRecognition) {
-      alert("El reconocimiento de voz no está soportado en este entorno.");
-      return;
-    }
-
+  const startListening = async () => {
     try {
-      const recognition = new SpeechRecognition();
-      recognition.lang = "es-MX";
-      recognition.interimResults = false;
-      recognition.maxAlternatives = 1;
+      const isNative = Capacitor.isNativePlatform();
 
-      recognition.onresult = (e) => {
-        const transcript = e.results[0][0].transcript;
-        onSend(transcript, "voice");
-      };
+      if (isNative) {
+        // Pedir permisos nativos explícitamente al sistema Android
+        const permissionStatus = await SpeechRecognition.requestPermissions();
+        if (permissionStatus.speechRecognition !== "granted") {
+          alert("Se requieren permisos de micrófono para usar la voz.");
+          return;
+        }
 
-      recognition.onerror = (event) => {
-        console.error("Error de reconocimiento de voz:", event.error);
-        // Esto te dirá exactamente si es un problema de red, permisos o incompatibilidad del WebView
-        alert(`Fallo en voz: ${event.error}`);
+        setListening(true);
+
+        // Iniciar reconocimiento nativo de la comunidad Capacitor
+        const result = await SpeechRecognition.start({
+          language: "es-MX",
+          maxResults: 1,
+          prompt: "Habla ahora...",
+          popup: true, // true muestra un diálogo nativo flotante muy confiable en Android
+          partialResults: false,
+        });
+
+        if (result && result.matches && result.matches.length > 0) {
+          const transcript = result.matches[0];
+          onSend(transcript, "voice");
+        }
         setListening(false);
-      };
-
-      recognition.onnomatch = () => {
-        console.warn("No se reconoció ninguna voz clara.");
-        setListening(false);
-      };
-
-      recognition.onend = () => {
-        setListening(false);
-      };
-
-      recognition.start();
-      recognitionRef.current = recognition;
-      setListening(true);
+      } else {
+        // Respaldo por si se prueba en navegador web de escritorio
+        const WebSpeech = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!WebSpeech) {
+          alert("El reconocimiento de voz no está soportado en este navegador.");
+          return;
+        }
+        const recognition = new WebSpeech();
+        recognition.lang = "es-MX";
+        recognition.onresult = (e) => {
+          onSend(e.results[0][0].transcript, "voice");
+          setListening(false);
+        };
+        recognition.onerror = (ev) => {
+          alert(`Fallo en voz web: ${ev.error}`);
+          setListening(false);
+        };
+        recognition.onend = () => setListening(false);
+        setListening(true);
+        recognition.start();
+      }
     } catch (err) {
-      console.error("Excepción al iniciar el reconocimiento:", err);
-      alert("No se pudo iniciar el micrófono.");
+      console.error("Error al iniciar el reconocimiento de voz:", err);
+      alert("No se pudo inicializar el micrófono.");
       setListening(false);
     }
   };
@@ -74,8 +85,8 @@ export default function ChatInput({ onSend, disabled, navigation }) {
         <button
           className={`icon-btn ${listening ? "mic-active" : ""}`}
           onClick={startListening}
-          disabled={disabled || !SpeechRecognition}
-          title={SpeechRecognition ? "Hablar" : "Voz no soportada"}
+          disabled={disabled}
+          title="Hablar"
           type="button"
         >
           <span className="mic-glyph" />
