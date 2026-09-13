@@ -319,7 +319,22 @@ def run_turn(
 
         for tc, name in domain_calls:
             tool_input = json.loads(tc.function.arguments or "{}")
-            result = _run_domain_tool(db, user_id, name, tool_input)
+            tool = normalize_tool_name(name)
+            if tool in SENSITIVE_TOOLS:
+                logger.warning(
+                    "Ejecucion directa bloqueada para usuario %s: el modelo intento "
+                    "llamar el tool sensible '%s' fuera del flujo de confirmacion",
+                    user_id,
+                    tool,
+                )
+                result = {
+                    "error": "esta accion requiere que el usuario la confirme desde "
+                    "un boton visible en pantalla; arma una pantalla "
+                    "ConfirmationSummary con esta accion en lugar de ejecutarla "
+                    "directamente"
+                }
+            else:
+                result = _run_domain_tool(db, user_id, name, tool_input)
             turn_tool_names.append(name)
             turn_tool_args[name] = tool_input
             turn_data_snapshot[name] = result

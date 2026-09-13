@@ -22,6 +22,7 @@ from app.models import (
     CreditAccount,
     FinancialGoal,
     InterfaceHistory,
+    Investment,
     Movement,
     SessionState,
     User,
@@ -226,6 +227,51 @@ db.close()
         with self.assertRaises(HTTPException) as raised:
             execute_action(request, self.db, self.user)
         self.assertEqual(raised.exception.status_code, 409)
+
+    def test_model_cannot_execute_sensitive_tool_directly_in_run_turn(self):
+        investment_args = {
+            "product_id": "cetes",
+            "product_title": "CETES",
+            "amount": 5000.0,
+            "term_months": 12,
+            "rate": 9.8,
+        }
+        client = _FakeClient([
+            _response(_tool_call(
+                "direct-sensitive",
+                "functions.confirm_investment",
+                investment_args,
+            )),
+            _response(content="Necesito mostrarte una confirmacion primero."),
+        ])
+
+        with patch("app.llm.orchestrator.get_client", return_value=client):
+            response = run_turn(
+                self.db,
+                self.user_id,
+                self.user.full_name,
+                [],
+                "si, confirmalo",
+            )
+
+        self.assertEqual(
+            response.payload,
+            "Necesito mostrarte una confirmacion primero.",
+        )
+        self.assertEqual(
+            self.db.query(Investment).filter(Investment.user_id == self.user_id).count(),
+            0,
+        )
+        tool_messages = [
+            message
+            for message in client.calls[1]["messages"]
+            if message["role"] == "tool"
+            and message["tool_call_id"] == "direct-sensitive"
+        ]
+        self.assertEqual(len(tool_messages), 1)
+        refusal = json.loads(tool_messages[0]["content"])
+        self.assertIn("error", refusal)
+        self.assertIn("boton visible", refusal["error"])
 
     def test_execute_transfer_without_active_confirmation_is_rejected(self):
         self.db.add(SessionState(
