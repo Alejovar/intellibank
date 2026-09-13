@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-secret-change-me"
     cors_origins: str = "http://localhost:5173"
     webauthn_rp_id: str = "localhost"
-    webauthn_rp_name: str = "Banca AI"
+    webauthn_rp_name: str = "Banorte"
     webauthn_origin: str = "http://localhost:5173"
 
     class Config:

@@ -77,8 +77,12 @@ export default function ChatInput({ onSend, disabled, navigation }) {
           onClick={startListening}
           disabled={disabled || (!SpeechRecognition && !canRecordAudio)}
           title={SpeechRecognition || canRecordAudio ? "Hablar" : "Voz no soportada en este navegador"}
+          aria-label={SpeechRecognition || canRecordAudio ? "Hablar" : "Voz no disponible"}
         >
-          <span className="mic-glyph" />
+          <svg className="mic-glyph" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="8" y="2.75" width="8" height="12" rx="4" />
+            <path d="M5.75 11.25v.75a6.25 6.25 0 0 0 12.5 0v-.75M12 18.25v3M8.75 21.25h6.5" />
+          </svg>
         </button>
         <input
           placeholder="Cuéntame lo que necesitas…"

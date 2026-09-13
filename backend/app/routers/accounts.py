@@ -8,6 +8,7 @@ from ..llm.tools import (
     get_credit_status,
     get_expenses_summary,
     get_movements,
+    get_portfolio,
 )
 
 
@@ -20,10 +21,18 @@ def home_summary(
     user=Depends(auth_module.get_current_user),
 ):
     """Datos deterministas para la pantalla fija de Inicio."""
+    portfolio = get_portfolio(db, user.id)
+
     return {
         "user": {"fullName": user.full_name},
         "balance": get_balance(db, user.id),
         "creditStatus": get_credit_status(db, user.id),
         "recentMovements": get_movements(db, user.id, limit=4),
         "expensesSummary": get_expenses_summary(db, user.id),
+        "investmentStats": {
+            "totalValue": portfolio["totalValue"],
+            "totalGain": portfolio["totalGain"],
+            "gainPct": portfolio["gainPct"],
+            "positionCount": len(portfolio["positions"]),
+        },
     }

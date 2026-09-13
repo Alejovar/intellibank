@@ -8,9 +8,11 @@ export function StatusBar() {
 }
 
 export function Brand({ compact = false }) {
-  return compact ? (
-    <div className="brand">Banca <span className="brand-accent">AI</span></div>
-  ) : (
-    <strong>Banca <span className="brand-accent">AI</span></strong>
+  const className = compact ? "brand brand-lockup compact" : "brand-lockup";
+  return (
+    <div className={className} aria-label="Banorte">
+      <img className="brand-logo" src="/logobanorte.webp" alt="" />
+      <strong>Banorte</strong>
+    </div>
   );
 }

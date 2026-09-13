@@ -113,5 +113,7 @@ export const api = {
 
   listSavedScreens: () => request("/actions/saved-screens"),
 
+  listInterfaceHistory: () => request("/investments/history"),
+
   getHomeSummary: () => request("/accounts/home-summary"),
 };

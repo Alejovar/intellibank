@@ -1,5 +1,6 @@
+import re
 from typing import Any, Literal, Optional
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from .a2ui import A2UIEnvelope
 
 
@@ -21,6 +22,42 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     clave_bancaria: str | None = None
     card_number: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str) -> str:
+        value = value.strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", value):
+            raise ValueError("Ingresa un correo válido")
+        return value
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone(cls, value: str) -> str:
+        digits = re.sub(r"\D", "", value)
+        if len(digits) != 10:
+            raise ValueError("El teléfono debe tener 10 dígitos")
+        return digits
+
+    @field_validator("clave_bancaria")
+    @classmethod
+    def validate_clabe(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        digits = re.sub(r"\D", "", value)
+        if len(digits) != 18:
+            raise ValueError("La CLABE debe tener 18 dígitos")
+        return digits
+
+    @field_validator("card_number")
+    @classmethod
+    def validate_card(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        digits = re.sub(r"\D", "", value)
+        if len(digits) != 16:
+            raise ValueError("La tarjeta debe tener 16 dígitos")
+        return digits
 
     @model_validator(mode="after")
     def validate_login_identifier(self):

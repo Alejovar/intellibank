@@ -12,6 +12,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
+from app.llm import mcp_client
 from app.llm.orchestrator import reset_history, run_turn
 from app.llm.tools import TOOL_REGISTRY
 from app.models import Account, ConversationTurn, CreditAccount, SessionState, User
@@ -297,6 +298,18 @@ db.close()
         reset_history(self.db, self.user.id)
         self.assertEqual(self.db.query(ConversationTurn).count(), 0)
         self.assertIsNone(self.db.get(SessionState, self.user.id))
+
+
+class MCPTransportTest(unittest.TestCase):
+    def test_in_memory_transport_executes_domain_tool(self):
+        try:
+            result = mcp_client.call_domain_tool("get_portfolio", 999999, {})
+        finally:
+            mcp_client.shutdown()
+
+        self.assertNotIn("error", result)
+        self.assertEqual(result["totalValue"], 0)
+        self.assertEqual(result["positions"], [])
 
 
 if __name__ == "__main__":

@@ -20,9 +20,9 @@ def hash_pw(pw: str) -> str:
 
 
 def login(clave_bancaria: str, password: str, db: Session) -> tuple[str, User]:
-    user = db.query(User).filter(User.clave_bancaria == clave_bancaria).first()
+    user = find_user(clave_bancaria, db)
     if not user or user.password_hash != hash_pw(password):
-        raise HTTPException(status_code=401, detail="Clave bancaria o password incorrectos")
+        raise HTTPException(status_code=401, detail="Cuenta o contraseña incorrectas")
     token = secrets.token_hex(16)
     _SESSIONS[token] = user.id
     return token, user

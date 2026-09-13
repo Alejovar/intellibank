@@ -5,19 +5,17 @@ import asyncio
 from concurrent.futures import TimeoutError as FutureTimeoutError
 import json
 import logging
-import os
-from pathlib import Path
-import sys
 import threading
 from typing import Any
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.shared.memory import create_connected_server_and_client_session
 from mcp.types import TextContent
+
+from ..mcp_server import server as domain_server
 
 logger = logging.getLogger("banorte.mcp_client")
 
-_BACKEND_DIR = Path(__file__).resolve().parents[2]
 _START_TIMEOUT_SECONDS = 15
 _CALL_TIMEOUT_SECONDS = 30
 _SHUTDOWN_TIMEOUT_SECONDS = 10
@@ -71,22 +69,16 @@ class _PersistentMCPClient:
             loop.close()
 
     async def _serve(self) -> None:
-        params = StdioServerParameters(
-            command=sys.executable,
-            args=["-m", "app.mcp_server"],
-            cwd=_BACKEND_DIR,
-            env=dict(os.environ),
-        )
         self._stop_event = asyncio.Event()
-        async with stdio_client(params) as (read_stream, write_stream):
-            async with ClientSession(read_stream, write_stream) as session:
-                await session.initialize()
-                self._session = session
-                self._ready.set()
-                # A short timer also keeps cross-thread submissions responsive
-                # in runtimes where the selector's self-pipe wakeup is limited.
-                while not self._stop_event.is_set():
-                    await asyncio.sleep(0.1)
+        # El cliente y el servidor siguen comunicandose con mensajes MCP, pero
+        # usan streams en memoria. Esto evita las tuberias stdio de Windows,
+        # que fallan con WinError 6 cuando el backend corre en un hilo y/o con
+        # un interprete distinto al usado para crear el virtualenv.
+        async with create_connected_server_and_client_session(domain_server) as session:
+            self._session = session
+            self._ready.set()
+            while not self._stop_event.is_set():
+                await asyncio.sleep(0.1)
 
     async def _call(self, name: str, user_id: int, arguments: dict[str, Any]) -> dict:
         if self._session is None:

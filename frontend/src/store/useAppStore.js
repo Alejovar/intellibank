@@ -1,5 +1,14 @@
 import { create } from "zustand";
 
+const getSavedCategories = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem("banorte_assistant_topics") || "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+};
+
 /**
  * Estado global minimo de la app. Guardamos:
  * - sesion (token/nombre)
@@ -13,7 +22,7 @@ export const useAppStore = create((set, get) => ({
   fullName: localStorage.getItem("banorte_name") || "",
   onboardingDone: localStorage.getItem("banorte_onboarding") === "1",
 
-  activeCategories: [],
+  activeCategories: getSavedCategories(),
   thread: [], // [{kind:"chat", role, text} | {kind:"screen", envelope}]
   currentScreen: null, // la ultima A2UIScreen/Clarification mostrada a pantalla completa
   loading: false,
@@ -34,7 +43,11 @@ export const useAppStore = create((set, get) => ({
   },
 
   logout: () => {
-    localStorage.clear();
+    // Cerrar sesion no debe hacer que este dispositivo olvide que la cuenta
+    // ya fue registrada ni eliminar la passkey configurada.
+    localStorage.removeItem("banorte_token");
+    localStorage.removeItem("banorte_name");
+    localStorage.removeItem("banorte_onboarding");
     set({ token: null, fullName: "", onboardingDone: false, thread: [], currentScreen: null });
   },
 
@@ -45,11 +58,11 @@ export const useAppStore = create((set, get) => ({
 
   toggleCategory: (cat) => {
     const current = get().activeCategories;
-    set({
-      activeCategories: current.includes(cat)
-        ? current.filter((c) => c !== cat)
-        : [...current, cat],
-    });
+    const activeCategories = current.includes(cat)
+      ? current.filter((c) => c !== cat)
+      : [...current, cat];
+    localStorage.setItem("banorte_assistant_topics", JSON.stringify(activeCategories));
+    set({ activeCategories });
   },
 
   setLoading: (v) => set({ loading: v }),

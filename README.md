@@ -108,7 +108,7 @@ archivos nuevos de la maquina de estados.
 backend/
   app/
     main.py                 FastAPI app, CORS, seed al iniciar
-    mcp_server.py           Servidor MCP stdio; ejecuta tools de dominio contra SQLite
+    mcp_server.py           Servidor MCP; ejecuta tools de dominio contra SQLite
     models.py                SQLAlchemy (datos 100% sinteticos)
     seed.py                   Carga datos demo si la DB esta vacia
     auth.py                    Login simple (clave + password) -> token
@@ -187,10 +187,10 @@ por separado).
   `ALLOWED_STAGE_TRANSITIONS` en `orchestrator.py` antes de aceptarla — si
   el LLM intenta un salto no permitido, se degrada a una aclaracion en vez
   de mandar la pantalla al cliente.
-- Las tools de dominio (`DOMAIN_TOOLS`) NO se ejecutan en el mismo proceso:
-  el LLM las llama via function-calling de OpenAI, pero la ejecucion real
-  cruza un cliente/servidor MCP (`mcp_client.py`/`mcp_server.py`) por stdio
-  contra SQLite. Las tools de emision de UI (`emit_screen`/
+- Las tools de dominio (`DOMAIN_TOOLS`) cruzan una frontera cliente/servidor
+  MCP real (`mcp_client.py`/`mcp_server.py`) mediante streams persistentes en
+  memoria y se ejecutan contra SQLite. Esto conserva el protocolo MCP sin
+  depender de tuberias `stdio`, que son fragiles en Windows. Las tools de emision de UI (`emit_screen`/
   `emit_clarification`) se quedan locales, ya que son el protocolo propio
   de la app, no acceso a un sistema externo.
 - El orquestador limita a `MAX_TOOL_ITERATIONS = 6` llamadas de tool por

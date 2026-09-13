@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useAppStore } from "./store/useAppStore";
 import LoginScreen from "./screens/LoginScreen";
 import OnboardingScreen from "./screens/OnboardingScreen";
-import CategorySelection from "./screens/CategorySelection";
 import AssistantScreen from "./screens/AssistantScreen";
 import HomeScreen from "./screens/HomeScreen";
 import SavedScreensScreen from "./screens/SavedScreensScreen";
@@ -12,7 +11,6 @@ export default function App() {
   const token = useAppStore((s) => s.token);
   const onboardingDone = useAppStore((s) => s.onboardingDone);
   const [page, setPage] = useState("home");
-  const [categoryPicked, setCategoryPicked] = useState(false);
   const [initialMessage, setInitialMessage] = useState(null);
 
   useEffect(() => {
@@ -21,13 +19,6 @@ export default function App() {
 
   const openAssistant = (message = null) => {
     setInitialMessage(message);
-    setCategoryPicked(Boolean(message));
-    setPage("assistant");
-  };
-
-  const changeCategories = () => {
-    setInitialMessage(null);
-    setCategoryPicked(false);
     setPage("assistant");
   };
 
@@ -39,19 +30,13 @@ export default function App() {
   } else if (page === "saved") {
     screen = <SavedScreensScreen onNavigate={setPage} onStartAssistant={openAssistant} />;
   } else if (page === "more") {
-    screen = <MoreScreen onNavigate={setPage} onChangeCategories={changeCategories} onStartAssistant={openAssistant} />;
-  } else if (!categoryPicked) {
-    screen = <CategorySelection onNavigate={setPage} onContinue={(msg) => {
-      setInitialMessage(msg || null);
-      setCategoryPicked(true);
-    }} />;
+    screen = <MoreScreen onNavigate={setPage} onStartAssistant={openAssistant} />;
   } else {
     screen = (
       <AssistantScreen
         initialMessage={initialMessage}
         onInitialMessageConsumed={() => setInitialMessage(null)}
         onNavigate={setPage}
-        onChangeCategories={changeCategories}
       />
     );
   }

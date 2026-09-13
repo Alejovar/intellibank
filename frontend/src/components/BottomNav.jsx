@@ -1,6 +1,8 @@
+import { useEffect, useRef, useState } from "react";
+
 const TABS = [
   { key: "home", label: "Inicio" },
-  { key: "saved", label: "Guardadas" },
+  { key: "saved", label: "Historial" },
   { key: "assistant", label: "Asistente" },
   { key: "more", label: "Más" },
 ];
@@ -19,18 +21,46 @@ function NavIcon({ tab }) {
 }
 
 export default function BottomNav({ activeTab, onChange }) {
+  const activeIndex = Math.max(TABS.findIndex((tab) => tab.key === activeTab), 0);
+  const [indicatorIndex, setIndicatorIndex] = useState(activeIndex);
+  const navigationTimer = useRef(null);
+
+  useEffect(() => {
+    setIndicatorIndex(activeIndex);
+  }, [activeIndex]);
+
+  useEffect(() => () => window.clearTimeout(navigationTimer.current), []);
+
+  const navigate = (tab) => {
+    const targetIndex = TABS.findIndex((item) => item.key === tab);
+    if (targetIndex < 0 || targetIndex === indicatorIndex) return;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      onChange(tab);
+      return;
+    }
+
+    window.clearTimeout(navigationTimer.current);
+    setIndicatorIndex(targetIndex);
+    navigationTimer.current = window.setTimeout(() => {
+      onChange(tab);
+    }, 380);
+  };
+
   return (
     <nav className="bottom-nav" aria-label="Navegación principal">
-      <div className="bottom-nav-items">
-        {TABS.map((tab) => (
+      <div className="bottom-nav-items" style={{ "--active-index": indicatorIndex }}>
+        <span className="nav-active-indicator" aria-hidden="true" />
+        {TABS.map((tab, index) => (
           <button
             key={tab.key}
-            className={`nav-item ${activeTab === tab.key ? "active" : ""}`}
-            onClick={() => onChange(tab.key)}
+            className={`nav-item ${indicatorIndex === index ? "active" : ""}`}
+            onClick={() => navigate(tab.key)}
+            aria-label={tab.label}
             aria-current={activeTab === tab.key ? "page" : undefined}
+            title={tab.label}
           >
             <span className="nav-icon"><NavIcon tab={tab.key} /></span>
-            <span>{tab.label}</span>
           </button>
         ))}
       </div>
