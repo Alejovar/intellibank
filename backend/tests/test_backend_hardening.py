@@ -16,9 +16,17 @@ from app import auth as auth_module
 from app.llm import mcp_client
 from app.llm.orchestrator import reset_history, run_turn
 from app.llm.tools import TOOL_REGISTRY
-from app.models import Account, ConversationTurn, CreditAccount, SessionState, User
+from app.models import (
+    Account,
+    ConversationTurn,
+    CreditAccount,
+    InterfaceHistory,
+    SessionState,
+    User,
+)
 from app.routers.actions import execute_action
-from app.schemas.chat import ActionExecuteRequest
+from app.routers.investments import replay_history_item
+from app.schemas.chat import ActionExecuteRequest, HistoryReplayRequest
 
 
 def _tool_call(call_id, name, arguments):
@@ -36,8 +44,14 @@ def _response(*tool_calls, content=None):
 class _FakeClient:
     def __init__(self, responses):
         self._responses = iter(responses)
+        self.calls = []
+
+        def create(**kwargs):
+            self.calls.append(kwargs)
+            return next(self._responses)
+
         self.chat = SimpleNamespace(
-            completions=SimpleNamespace(create=lambda **kwargs: next(self._responses))
+            completions=SimpleNamespace(create=create)
         )
 
 
@@ -299,6 +313,75 @@ db.close()
         reset_history(self.db, self.user.id)
         self.assertEqual(self.db.query(ConversationTurn).count(), 0)
         self.assertIsNone(self.db.get(SessionState, self.user.id))
+
+    def test_history_replay_starts_clean_and_regenerates_ui(self):
+        self.db.add(ConversationTurn(
+            user_id=self.user.id,
+            role="assistant",
+            content=json.dumps({
+                "role": "assistant",
+                "content": "Ya te mostre esta interfaz",
+            }),
+        ))
+        self.db.add(SessionState(
+            user_id=self.user.id,
+            current_stage="result",
+            last_screen_id="anterior",
+        ))
+        saved = InterfaceHistory(
+            user_id=self.user.id,
+            title="Resumen de inversiones",
+            user_prompt="Muestrame mis inversiones",
+            intent="view_portfolio",
+            tool_names=["get_portfolio"],
+            tool_args={"get_portfolio": {}},
+            data_snapshot={},
+            a2ui_payload={
+                "id": "anterior",
+                "title": "Resumen anterior",
+                "stage_kind": "generated",
+                "stage_label": "Inversiones",
+                "components": [],
+            },
+        )
+        self.db.add(saved)
+        self.db.commit()
+
+        regenerated_screen = {
+            "id": "inversiones-actualizadas",
+            "title": "Inversiones actualizadas",
+            "stage_kind": "generated",
+            "stage_label": "Inversiones",
+            "components": [{"id": "balance", "component": "BalanceCard"}],
+        }
+        client = _FakeClient([
+            _response(_tool_call("data-replay", "get_balance", {})),
+            _response(_tool_call("ui-replay", "emit_screen", regenerated_screen)),
+        ])
+
+        with patch("app.llm.orchestrator.get_client", return_value=client):
+            result = replay_history_item(
+                saved.id,
+                HistoryReplayRequest(active_categories=["Inversiones"]),
+                self.db,
+                self.user,
+            )
+
+        self.assertEqual(result.response.payload.id, "inversiones-actualizadas")
+        turns = self.db.query(ConversationTurn).order_by(ConversationTurn.id).all()
+        first_turn = json.loads(turns[0].content)
+        self.assertEqual(first_turn["role"], "user")
+        self.assertEqual(first_turn["content"], "Muestrame mis inversiones")
+        self.assertNotIn("Ya te mostre", " ".join(row.content for row in turns))
+        self.assertEqual(self.db.query(InterfaceHistory).count(), 1)
+        supplied_tools = {
+            spec["function"]["name"]
+            for spec in client.calls[0]["tools"]
+        }
+        self.assertIn("get_balance", supplied_tools)
+        self.assertIn("emit_screen", supplied_tools)
+        self.assertNotIn("apply_credit_plan", supplied_tools)
+        self.assertTrue(all(call["tool_choice"] == "required" for call in client.calls))
 
     def test_phone_is_a_unique_login_identifier(self):
         self.user.phone = "5512345678"

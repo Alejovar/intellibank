@@ -96,6 +96,10 @@ class ChatMessageRequest(BaseModel):
     active_categories: list[str] = []
 
 
+class HistoryReplayRequest(BaseModel):
+    active_categories: list[str] = []
+
+
 class ChatTextResponse(BaseModel):
     mime_type: Literal["text/plain"] = "text/plain"
     payload: str

@@ -4,6 +4,7 @@ import A2UIRenderer from "../components/A2UIRenderer";
 import BottomNav from "../components/BottomNav";
 import ChatInput from "../components/ChatInput";
 import { Brand, StatusBar } from "../components/PhoneChrome";
+import { useAppStore } from "../store/useAppStore";
 
 const TINTS = [
   { background: "#FBE9ED", color: "#C2002E" },
@@ -34,6 +35,11 @@ export default function SavedScreensScreen({ onNavigate, onStartAssistant }) {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState({ saved: true, history: true });
   const [errors, setErrors] = useState({ saved: null, history: null });
+  const activeCategories = useAppStore((s) => s.activeCategories);
+  const resetThread = useAppStore((s) => s.resetThread);
+  const applyResponse = useAppStore((s) => s.applyResponse);
+  const setAssistantLoading = useAppStore((s) => s.setLoading);
+  const setAssistantError = useAppStore((s) => s.setError);
 
   useEffect(() => {
     api.listInterfaceHistory()
@@ -47,9 +53,20 @@ export default function SavedScreensScreen({ onNavigate, onStartAssistant }) {
       .finally(() => setLoading((current) => ({ ...current, saved: false })));
   }, []);
 
-  const reopenInterface = (screen) => {
-    const prompt = screen.prompt?.trim() || `Vuelve a generar la interfaz: ${screen.title}`;
-    onStartAssistant(prompt);
+  const reopenInterface = async (screen) => {
+    resetThread();
+    setAssistantError(null);
+    setAssistantLoading(true);
+    onNavigate("assistant");
+
+    try {
+      const result = await api.replayInterfaceHistory(screen.id, activeCategories);
+      applyResponse(result.response);
+    } catch (err) {
+      setAssistantError(err.message);
+    } finally {
+      setAssistantLoading(false);
+    }
   };
 
   const screens = view === "saved" ? savedScreens : history;

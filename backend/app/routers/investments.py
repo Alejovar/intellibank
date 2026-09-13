@@ -6,15 +6,45 @@ from sqlalchemy.orm import Session
 
 from .. import auth as auth_module
 from ..database import get_db
-from ..llm.tools import (
-    calculate_performance,
-    get_investment_cashflows,
-    get_investment_profile,
-    get_portfolio,
-)
+from ..llm.orchestrator import reset_history, run_turn
 from ..models import InterfaceHistory
+from ..schemas.chat import ChatResponse, HistoryReplayRequest
 
 router = APIRouter(prefix="/investments", tags=["investments"])
+
+REPLAY_READ_ONLY_TOOLS = {
+    "get_credit_status",
+    "get_restructure_options",
+    "simulate_plan_payment",
+    "get_investment_profile",
+    "get_investment_products",
+    "get_portfolio",
+    "get_investment_cashflows",
+    "calculate_performance",
+    "compare_investments",
+    "get_investment_history",
+    "get_investment_options",
+    "simulate_investment",
+    "get_portfolio_overview",
+    "get_fixed_income_products",
+    "simulate_fixed_income",
+    "get_investment_funds",
+    "get_market_watchlist",
+    "get_market_positions",
+    "get_fx_rates",
+    "quote_fx_exchange",
+    "get_structured_notes",
+    "get_insurance_products",
+    "quote_insurance",
+    "get_insurance_claims_info",
+    "get_financial_diagnosis",
+    "get_financial_goals",
+    "get_habit_tips",
+    "get_expenses_summary",
+    "get_movements",
+    "get_balance",
+    "get_card_payment_info",
+}
 
 
 @router.get("/history")
@@ -70,16 +100,18 @@ def get_history_item(
     }
 
 
-@router.post("/history/{history_id}/replay")
+@router.post("/history/{history_id}/replay", response_model=ChatResponse)
 def replay_history_item(
     history_id: int,
+    body: HistoryReplayRequest,
     db: Session = Depends(get_db),
     user=Depends(auth_module.get_current_user),
 ):
-    """Reproduce una interfaz sin llamar al LLM.
+    """Vuelve a generar una interfaz histórica con datos actuales.
 
-    Solo se vuelven a ejecutar consultas de lectura conocidas. Las acciones de
-    escritura nunca se repiten desde el historial.
+    La reproducción empieza con contexto conversacional limpio para que el LLM
+    vuelva a invocar las funciones de dominio en lugar de contestar que ya
+    mostró la pantalla. No se crea otra entrada duplicada en el historial.
     """
     row = (
         db.query(InterfaceHistory)
@@ -89,26 +121,19 @@ def replay_history_item(
     if not row:
         raise HTTPException(status_code=404, detail="Interfaz historica no encontrada")
 
-    current = {
-        "get_portfolio": get_portfolio(db, user.id),
-        "calculate_performance": calculate_performance(db, user.id),
-        "get_investment_cashflows": get_investment_cashflows(db, user.id),
-        "get_investment_profile": get_investment_profile(db, user.id),
-    }
-    before = row.data_snapshot or {}
-    before_portfolio = before.get("get_portfolio") or {}
-    after_portfolio = current["get_portfolio"]
-    return {
-        "historyId": row.id,
-        "title": row.title,
-        "prompt": row.user_prompt,
-        "originalPayload": {"mime_type": "application/a2ui+json", "payload": row.a2ui_payload},
-        "before": before,
-        "after": current,
-        "comparison": {
-            "beforeTotalValue": before_portfolio.get("totalValue"),
-            "afterTotalValue": after_portfolio.get("totalValue"),
-            "beforeTotalGain": before_portfolio.get("totalGain"),
-            "afterTotalGain": after_portfolio.get("totalGain"),
-        },
-    }
+    prompt = (row.user_prompt or "").strip()
+    if not prompt:
+        prompt = f"Genera nuevamente la interfaz: {row.title}"
+
+    reset_history(db, user.id)
+    response = run_turn(
+        db=db,
+        user_id=user.id,
+        user_full_name=user.full_name,
+        active_categories=body.active_categories,
+        user_message=prompt,
+        record_interface=False,
+        allowed_domain_tools=REPLAY_READ_ONLY_TOOLS,
+        require_interface=True,
+    )
+    return ChatResponse(response=response)
