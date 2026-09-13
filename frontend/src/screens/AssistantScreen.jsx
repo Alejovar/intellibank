@@ -20,6 +20,7 @@ export default function AssistantScreen({ initialMessage, onInitialMessageConsum
   const fullName = useAppStore((s) => s.fullName);
 
   const [toast, setToast] = useState(null);
+  const chatBodyRef = useRef(null);
   const bottomRef = useRef(null);
   const sentInitial = useRef(false);
   const itemRefs = useRef({});
@@ -52,7 +53,9 @@ export default function AssistantScreen({ initialMessage, onInitialMessageConsum
   }, [initialMessage]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const chatBody = chatBodyRef.current;
+    if (!chatBody) return;
+    chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: "smooth" });
   }, [thread]);
 
   const handleSaveOrDiscard = async (action, envelope) => {
@@ -84,7 +87,7 @@ export default function AssistantScreen({ initialMessage, onInitialMessageConsum
         </div>
       )}
 
-      <div className="screen-body assistant-chat-body">
+      <div ref={chatBodyRef} className="screen-body assistant-chat-body">
         {thread.length === 0 && !loading && (
           <div className="assistant-empty-state">
             <div className="assistant-spark" aria-hidden="true">
