@@ -33,7 +33,7 @@ export default function ChatInput({ onSend, disabled, navigation }) {
         language: "es-MX",
         maxResults: 1,
         prompt: "Habla ahora…",
-        popup: true,
+        popup: false,
         partialResults: false,
       });
       if (matches?.[0]) onSend(matches[0], "voice");
