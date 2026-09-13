@@ -20,7 +20,9 @@ from app.models import (
     Account,
     ConversationTurn,
     CreditAccount,
+    FinancialGoal,
     InterfaceHistory,
+    Movement,
     SessionState,
     User,
 )
@@ -223,6 +225,136 @@ db.close()
         with self.assertRaises(HTTPException) as raised:
             execute_action(request, self.db, self.user)
         self.assertEqual(raised.exception.status_code, 409)
+
+    def test_execute_transfer_without_active_confirmation_is_rejected(self):
+        self.db.add(SessionState(
+            user_id=self.user_id,
+            current_stage="generated",
+            last_screen_id="transferencia",
+            last_screen_payload={
+                "id": "transferencia",
+                "components": [{
+                    "actions": [{"tool": "execute_transfer"}],
+                }],
+                "footer_actions": [],
+            },
+        ))
+        self.db.commit()
+        request = ActionExecuteRequest(
+            tool="execute_transfer",
+            args={"to": "Ana Lopez", "amount": 500, "concept": "Cena"},
+            screen_id="transferencia",
+        )
+        with self.assertRaises(HTTPException) as raised:
+            execute_action(request, self.db, self.user)
+        self.assertEqual(raised.exception.status_code, 403)
+
+    def test_execute_transfer_decrements_balance_and_inserts_movement(self):
+        account = self.db.query(Account).filter(Account.user_id == self.user_id).one()
+        previous_balance = account.balance
+
+        result = TOOL_REGISTRY["execute_transfer"](
+            db=self.db,
+            user_id=self.user_id,
+            to="Ana Lopez",
+            amount=500,
+            concept="Cena",
+        )
+
+        self.db.refresh(account)
+        movement = self.db.query(Movement).filter(
+            Movement.account_id == account.id,
+            Movement.category == "Transferencia",
+        ).one()
+        self.assertTrue(result["transferred"])
+        self.assertEqual(account.balance, previous_balance - 500)
+        self.assertEqual(result["newBalance"], previous_balance - 500)
+        self.assertEqual(movement.amount, -500)
+        self.assertEqual(movement.description, "Ana Lopez - Cena")
+
+    def test_execute_transfer_rejects_insufficient_balance_without_mutation(self):
+        account = self.db.query(Account).filter(Account.user_id == self.user_id).one()
+        previous_balance = account.balance
+        previous_movements = self.db.query(Movement).count()
+
+        result = TOOL_REGISTRY["execute_transfer"](
+            db=self.db,
+            user_id=self.user_id,
+            to="Ana Lopez",
+            amount=previous_balance + 1,
+            concept="Monto excesivo",
+        )
+
+        self.db.refresh(account)
+        self.assertEqual(result["error"], "saldo insuficiente")
+        self.assertEqual(account.balance, previous_balance)
+        self.assertEqual(self.db.query(Movement).count(), previous_movements)
+
+    def test_quote_transfer_does_not_mutate_balance_or_movements(self):
+        account = self.db.query(Account).filter(Account.user_id == self.user_id).one()
+        previous_balance = account.balance
+        previous_movements = self.db.query(Movement).count()
+
+        result = TOOL_REGISTRY["quote_transfer"](
+            db=self.db, user_id=self.user_id, to="Ana Lopez",
+            amount=200, concept="Prueba",
+        )
+
+        self.db.refresh(account)
+        self.assertEqual(result["amount"], 200)
+        self.assertEqual(result["to"], "Ana Lopez")
+        self.assertEqual(account.balance, previous_balance)
+        self.assertEqual(self.db.query(Movement).count(), previous_movements)
+
+    def test_quote_transfer_rejects_amount_over_balance(self):
+        account = self.db.query(Account).filter(Account.user_id == self.user_id).one()
+        result = TOOL_REGISTRY["quote_transfer"](
+            db=self.db, user_id=self.user_id, to="Ana Lopez",
+            amount=account.balance + 1, concept="",
+        )
+        self.assertEqual(result["error"], "saldo insuficiente")
+
+    def test_preview_goal_contribution_does_not_mutate_saved_amount(self):
+        goal = FinancialGoal(
+            user_id=self.user_id, name="Meta prueba",
+            target_amount=10000.0, saved_amount=1000.0,
+        )
+        self.db.add(goal)
+        self.db.commit()
+
+        result = TOOL_REGISTRY["preview_goal_contribution"](
+            db=self.db, user_id=self.user_id, goal_id=goal.id, amount=500,
+        )
+
+        self.db.refresh(goal)
+        self.assertEqual(result["projectedSavedAmount"], 1500.0)
+        self.assertEqual(goal.saved_amount, 1000.0)
+
+    def test_contribute_to_goal_without_active_confirmation_is_rejected(self):
+        goal = FinancialGoal(
+            user_id=self.user_id, name="Meta prueba",
+            target_amount=10000.0, saved_amount=0.0,
+        )
+        self.db.add(goal)
+        self.db.add(SessionState(
+            user_id=self.user_id,
+            current_stage="generated",
+            last_screen_id="metas",
+            last_screen_payload={
+                "id": "metas",
+                "components": [{"actions": [{"tool": "contribute_to_goal"}]}],
+                "footer_actions": [],
+            },
+        ))
+        self.db.commit()
+        request = ActionExecuteRequest(
+            tool="contribute_to_goal",
+            args={"goal_id": goal.id, "amount": 500},
+            screen_id="metas",
+        )
+        with self.assertRaises(HTTPException) as raised:
+            execute_action(request, self.db, self.user)
+        self.assertEqual(raised.exception.status_code, 403)
 
     def test_action_rejects_stale_unoffered_and_unconfirmed_requests(self):
         self.db.add(SessionState(

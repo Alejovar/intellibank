@@ -7,11 +7,29 @@ from .database import SessionLocal, engine, Base
 from .models import (
     User, Account, Movement, CreditAccount, ExpenseLimit, InvestmentProfile,
     Investment, InvestmentProduct, InvestmentTransaction, PortfolioSnapshot,
+    Payee,
 )
 
 
 def hash_pw(pw: str) -> str:
     return hashlib.sha256(pw.encode()).hexdigest()
+
+
+def ensure_demo_payees(db, user: User) -> None:
+    """Agrega destinatarios demo sin duplicarlos en reinicios posteriores."""
+    payees = [
+        ("Ana Lopez", "**** 1842"),
+        ("Carlos Ramirez", "**** 9307"),
+        ("Renta departamento", "**** 6615"),
+    ]
+    existing_labels = {
+        row.label for row in db.query(Payee).filter(Payee.user_id == user.id).all()
+    }
+    db.add_all([
+        Payee(user_id=user.id, label=label, masked_account=masked_account)
+        for label, masked_account in payees
+        if label not in existing_labels
+    ])
 
 
 def ensure_investment_demo_data(db, user: User) -> None:
@@ -98,6 +116,7 @@ def seed_if_empty():
         existing_user = db.query(User).first()
         if existing_user:
             ensure_investment_demo_data(db, existing_user)
+            ensure_demo_payees(db, existing_user)
             db.commit()
             return
 
@@ -118,6 +137,8 @@ def seed_if_empty():
         )
         db.add(account)
         db.flush()
+
+        ensure_demo_payees(db, user)
 
         categories = [
             ("Comida", 38, "#EB0029"),

@@ -26,6 +26,7 @@ class User(Base):
     onboarding_done = Column(Boolean, default=False)
 
     accounts = relationship("Account", back_populates="owner")
+    payees = relationship("Payee", back_populates="owner")
     credit_accounts = relationship("CreditAccount", back_populates="owner")
     generated_screens = relationship("SavedScreen", back_populates="owner")
 
@@ -41,6 +42,16 @@ class Account(Base):
 
     owner = relationship("User", back_populates="accounts")
     movements = relationship("Movement", back_populates="account")
+
+
+class Payee(Base):
+    __tablename__ = "payees"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    label = Column(String, nullable=False)
+    masked_account = Column(String, nullable=False)
+
+    owner = relationship("User", back_populates="payees")
 
 
 class Movement(Base):

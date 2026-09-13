@@ -26,6 +26,7 @@ COMPONENT_CATALOG = {
     "BalanceCard",
     "MovementsTable",
     "ExpenseChart",
+    "BarChart",
     "OptionsList",
     "PaymentSlider",
     "TransferForm",
@@ -45,6 +46,7 @@ COMPONENT_CATALOG = {
     "InvestmentProductList",
     "RiskProfileSelector",
     "BeforeAfterPortfolio",
+    "SavingsGoalCard",
 }
 
 
@@ -94,7 +96,7 @@ class A2UIScreen(BaseModel):
     footer_actions: list[ActionSpec] = Field(default_factory=list)
     saveable: bool = True
     stage_kind: StageKind = "generated"
-    stage_label: str = Field(default="UI generada", max_length=24)
+    stage_label: str = Field(default="UI generada", max_length=32)
 
 
 class A2UIClarification(BaseModel):
@@ -104,7 +106,7 @@ class A2UIClarification(BaseModel):
     input_mode: Literal["choice", "free_text", "both"] = "both"
     options: list[str] = Field(default_factory=list)
     stage_kind: StageKind = "intent"
-    stage_label: str = Field(default="Intencion", max_length=24)
+    stage_label: str = Field(default="Intencion", max_length=32)
 
 
 class A2UIEnvelope(BaseModel):

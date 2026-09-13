@@ -340,6 +340,18 @@ DOMAIN_TOOLS = [
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "preview_goal_contribution",
+        "description": "Previsualiza el efecto de una aportacion a una meta sin registrarla. Usa esto como accion del boton Aportar de SavingsGoalCard antes de mostrar la confirmacion.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "goal_id": {"type": "integer"},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+            },
+            "required": ["goal_id", "amount"],
+        },
+    },
+    {
         "name": "contribute_to_goal",
         "description": "Registra una aportacion a una meta financiera sin exceder su monto objetivo.",
         "input_schema": {
@@ -377,9 +389,66 @@ DOMAIN_TOOLS = [
         },
     },
     {
+        "name": "search_movements",
+        "description": "Busca movimientos por categoria exacta sin distinguir mayusculas y por rango opcional de fechas ISO.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "category": {"type": "string"},
+                "date_from": {"type": "string", "description": "ISO date YYYY-MM-DD"},
+                "date_to": {"type": "string", "description": "ISO date YYYY-MM-DD"},
+                "limit": {"type": "integer", "default": 20},
+            },
+            "required": [],
+        },
+    },
+    {
         "name": "get_balance",
         "description": "Regresa el saldo de la cuenta principal.",
         "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_transfer_recipients",
+        "description": "Lista los destinatarios guardados del usuario para poblar el formulario de transferencia.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "add_transfer_recipient",
+        "description": "Guarda un nuevo destinatario de transferencia con nombre y cuenta enmascarada.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "label": {"type": "string"},
+                "masked_account": {"type": "string"},
+            },
+            "required": ["label", "masked_account"],
+        },
+    },
+    {
+        "name": "quote_transfer",
+        "description": "Valida y previsualiza una transferencia (destinatario, monto, saldo disponible) sin moverla. Usa esto como accion del TransferForm antes de mostrar la confirmacion.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string"},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+                "concept": {"type": "string"},
+            },
+            "required": ["to", "amount"],
+        },
+    },
+    {
+        "name": "execute_transfer",
+        "description": "Ejecuta una transferencia confirmada, descuenta el saldo y registra el movimiento.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string"},
+                "amount": {"type": "number", "exclusiveMinimum": 0},
+                "concept": {"type": "string"},
+            },
+            "required": ["to", "amount", "concept"],
+        },
     },
     {
         "name": "create_expense_limit",
@@ -462,12 +531,13 @@ _COMPONENT_SCHEMA = {
             "type": "string",
             "enum": [
                 "BalanceCard", "MovementsTable", "ExpenseChart", "OptionsList",
-                "PaymentSlider", "TransferForm", "SharedExpenseList",
+                "BarChart", "PaymentSlider", "TransferForm", "SharedExpenseList",
                 "ConfirmationSummary", "SuccessScreen", "InfoBanner", "TextBlock",
                 "MarketWatchlist", "CurrencyExchangeCard",
                 "PortfolioSummaryCard", "InvestmentPositionCard", "PortfolioTable",
                 "PerformanceChart", "CashflowTable", "InvestmentComparison",
                 "InvestmentProductList", "RiskProfileSelector", "BeforeAfterPortfolio",
+                "SavingsGoalCard",
             ],
         },
         "props": {"type": "object"},

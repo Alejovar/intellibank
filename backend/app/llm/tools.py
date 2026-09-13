@@ -12,12 +12,13 @@ con el catalogo de componentes.
 """
 from __future__ import annotations
 from datetime import datetime, timedelta
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from ..models import (
     Account, Movement, CreditAccount, ExpenseLimit, ScheduledPayment,
     InvestmentProfile, Investment, InsurancePolicy, InsuranceClaim,
     FinancialGoal, SharedExpenseGroup, InvestmentProduct, InvestmentTransaction,
-    PortfolioSnapshot, InterfaceHistory,
+    PortfolioSnapshot, InterfaceHistory, Payee,
 )
 
 
@@ -809,6 +810,29 @@ def get_financial_goals(db: Session, user_id: int) -> dict:
     ]}
 
 
+def preview_goal_contribution(db: Session, user_id: int, goal_id: int, amount: float) -> dict:
+    goal = db.query(FinancialGoal).filter(
+        FinancialGoal.id == goal_id, FinancialGoal.user_id == user_id
+    ).first()
+    if not goal:
+        return {"error": "meta financiera no encontrada"}
+    try:
+        amount = round(float(amount), 2)
+    except (TypeError, ValueError):
+        return {"error": "monto invalido"}
+    if amount <= 0:
+        return {"error": "la aportacion debe ser mayor a cero"}
+    current_saved = goal.saved_amount or 0.0
+    projected_saved = round(min(current_saved + amount, goal.target_amount), 2)
+    projected_progress = round(projected_saved / goal.target_amount * 100, 1)
+    return {
+        "goalId": goal.id, "name": goal.name, "amount": amount,
+        "currentSavedAmount": current_saved, "targetAmount": goal.target_amount,
+        "projectedSavedAmount": projected_saved,
+        "projectedProgressPercent": projected_progress,
+    }
+
+
 def contribute_to_goal(db: Session, user_id: int, goal_id: int, amount: float) -> dict:
     goal = db.query(FinancialGoal).get(goal_id)
     if not goal or goal.user_id != user_id:
@@ -893,6 +917,127 @@ def get_movements(db: Session, user_id: int, limit: int = 10) -> dict:
         {"date": m.date.strftime("%Y-%m-%d"), "description": m.description,
          "category": m.category, "amount": m.amount} for m in movs
     ]}
+
+
+def search_movements(db: Session, user_id: int, category: str | None = None,
+                     date_from: str | None = None, date_to: str | None = None,
+                     limit: int = 20) -> dict:
+    account = db.query(Account).filter(Account.user_id == user_id).first()
+    if not account:
+        return {"error": "cuenta no encontrada"}
+    query = db.query(Movement).filter(Movement.account_id == account.id)
+    if category:
+        query = query.filter(func.lower(Movement.category) == category.strip().lower())
+    try:
+        if date_from:
+            query = query.filter(Movement.date >= datetime.fromisoformat(date_from))
+        if date_to:
+            end = datetime.fromisoformat(date_to)
+            if len(date_to) == 10:
+                end += timedelta(days=1)
+                query = query.filter(Movement.date < end)
+            else:
+                query = query.filter(Movement.date <= end)
+    except ValueError:
+        return {"error": "rango de fechas invalido; usa fechas ISO YYYY-MM-DD"}
+    movs = query.order_by(Movement.date.desc()).limit(limit).all()
+    return {"movements": [
+        {"date": m.date.strftime("%Y-%m-%d"), "description": m.description,
+         "category": m.category, "amount": m.amount} for m in movs
+    ]}
+
+
+# ------------------------------------------------------------ transferencias
+def get_transfer_recipients(db: Session, user_id: int) -> dict:
+    payees = db.query(Payee).filter(Payee.user_id == user_id).order_by(Payee.id).all()
+    return {"recipients": [
+        {"id": payee.id, "label": payee.label,
+         "maskedAccount": payee.masked_account}
+        for payee in payees
+    ]}
+
+
+def add_transfer_recipient(db: Session, user_id: int, label: str,
+                           masked_account: str) -> dict:
+    label = label.strip()
+    masked_account = masked_account.strip()
+    if not label or not masked_account:
+        return {"error": "nombre y cuenta del destinatario son obligatorios"}
+    payee = Payee(user_id=user_id, label=label, masked_account=masked_account)
+    db.add(payee)
+    db.commit()
+    return {"recipientId": payee.id, "label": payee.label,
+            "maskedAccount": payee.masked_account, "created": True}
+
+
+def quote_transfer(db: Session, user_id: int, to: str, amount: float,
+                   concept: str = "") -> dict:
+    account = db.query(Account).filter(Account.user_id == user_id).first()
+    if not account:
+        return {"error": "cuenta no encontrada"}
+    try:
+        amount = round(float(amount), 2)
+    except (TypeError, ValueError):
+        return {"error": "monto invalido"}
+    if amount <= 0:
+        return {"error": "el monto debe ser mayor a cero"}
+    recipient = (to or "").strip()
+    if not recipient:
+        return {"error": "destinatario obligatorio"}
+    if amount > account.balance:
+        return {"error": "saldo insuficiente", "availableBalance": account.balance}
+    payee = db.query(Payee).filter(
+        Payee.user_id == user_id, func.lower(Payee.label) == recipient.lower()
+    ).first()
+    return {
+        "fromAccountLabel": account.label,
+        "to": payee.label if payee else recipient,
+        "maskedAccount": payee.masked_account if payee else None,
+        "amount": amount,
+        "concept": (concept or "").strip(),
+        "availableBalance": account.balance,
+    }
+
+
+def execute_transfer(db: Session, user_id: int, to: str, amount: float,
+                     concept: str) -> dict:
+    account = db.query(Account).filter(Account.user_id == user_id).first()
+    if not account:
+        return {"error": "cuenta no encontrada"}
+    try:
+        amount = round(float(amount), 2)
+    except (TypeError, ValueError):
+        return {"error": "monto invalido"}
+    if amount <= 0:
+        return {"error": "el monto debe ser mayor a cero"}
+    if amount > account.balance:
+        return {"error": "saldo insuficiente", "availableBalance": account.balance}
+    recipient = (to or "").strip()
+    if not recipient:
+        return {"error": "destinatario obligatorio"}
+    concept = (concept or "").strip()
+    description = f"{recipient} - {concept}" if concept else recipient
+    account.balance = round(account.balance - amount, 2)
+    movement = Movement(
+        account_id=account.id,
+        description=description,
+        category="Transferencia",
+        amount=-amount,
+    )
+    db.add(movement)
+    db.commit()
+    return {
+        "transferred": True,
+        "receipt": {
+            "movementId": movement.id,
+            "fromAccount": account.label,
+            "to": recipient,
+            "amount": amount,
+            "concept": concept,
+            "date": movement.date.strftime("%Y-%m-%d"),
+        },
+        "newBalance": account.balance,
+    }
 
 
 def get_balance(db: Session, user_id: int) -> dict:
@@ -1014,11 +1159,17 @@ TOOL_REGISTRY = {
     "get_financial_diagnosis": get_financial_diagnosis,
     "set_financial_goal": set_financial_goal,
     "get_financial_goals": get_financial_goals,
+    "preview_goal_contribution": preview_goal_contribution,
     "contribute_to_goal": contribute_to_goal,
     "get_habit_tips": get_habit_tips,
     "get_expenses_summary": get_expenses_summary,
     "get_movements": get_movements,
+    "search_movements": search_movements,
     "get_balance": get_balance,
+    "get_transfer_recipients": get_transfer_recipients,
+    "add_transfer_recipient": add_transfer_recipient,
+    "quote_transfer": quote_transfer,
+    "execute_transfer": execute_transfer,
     "create_expense_limit": create_expense_limit,
     "get_card_payment_info": get_card_payment_info,
     "schedule_payment": schedule_payment,

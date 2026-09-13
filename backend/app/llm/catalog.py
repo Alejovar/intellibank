@@ -38,6 +38,8 @@ CATALOGO CERRADO DE COMPONENTES (usa EXACTAMENTE estos nombres en "component"):
 
 6. TransferForm
    props: { fromAccountLabel, toLabel?, amount?, concept?, availableAccounts?: [string] }
+   actions: NUNCA lo dejes vacio; su boton "Continuar" llama a quote_transfer
+   pasando { to, amount, concept } (el formulario los agrega dinamicamente).
    Uso: formularios de transferencia/pago.
 
 7. SharedExpenseList
@@ -119,6 +121,22 @@ CATALOGO CERRADO DE COMPONENTES (usa EXACTAMENTE estos nombres en "component"):
     props: { before: { totalValue, totalGain, capturedAt? },
              after: { totalValue, totalGain, capturedAt? } }
     Uso: comparar una interfaz historica contra los datos actuales.
+
+23. BarChart
+    props: { title?, data: [{label, value, color?}], yLabel?, insightText? }
+    Uso: graficas de barras generales para movimientos o transferencias por periodo,
+    comparar metas de ahorro e ingresos contra gastos.
+
+24. SavingsGoalCard
+    props: { title, targetAmount, savedAmount, progressPct, targetDate?, term?, tint? }
+    actions: SIEMPRE incluye una accion preview_goal_contribution con { goal_id } en
+    args (la tarjeta agrega { amount } dinamicamente); NUNCA ates contribute_to_goal
+    directamente a esta tarjeta (es sensible). Con el resultado de
+    preview_goal_contribution arma una ConfirmationSummary cuya accion real sea
+    contribute_to_goal con requires_biometric=true. Nunca muestres esta tarjeta con
+    actions vacio: aportar mas es casi siempre el siguiente paso aplicable aunque
+    el usuario solo haya pedido "ver" sus metas.
+    Uso: mostrar el avance de una meta o apartado y permitir una nueva aportacion.
 
 REGLAS DE COMPOSICION:
 - Una pantalla (A2UIScreen) puede combinar 1 a 4 componentes en layout "stack" (vertical)

@@ -16,6 +16,7 @@ SENSITIVE_TOOLS = {
     "confirm_insurance_policy",
     "file_insurance_claim",
     "contribute_to_goal",
+    "execute_transfer",
 }
 
 
