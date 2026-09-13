@@ -10,9 +10,9 @@ export default function OptionsList({ options = [], selectionMode = "single", he
     options.find((o) => o.highlighted)?.id || null
   );
 
-  const select = (opt) => {
+  const select = (opt, index) => {
     setSelected(opt.id);
-    const action = actions[0];
+    const action = actions.length === options.length ? actions[index] : actions[0];
     if (action && onAction) {
       onAction({ ...action, args: { ...action.args, optionId: opt.id, optionTitle: opt.title } });
     }
@@ -21,13 +21,13 @@ export default function OptionsList({ options = [], selectionMode = "single", he
   return (
     <div className="card">
       {helperText && <div className="card-subtitle" style={{ marginBottom: 10 }}>{helperText}</div>}
-      {options.map((opt) => {
+      {options.map((opt, index) => {
         const isSelected = selected === opt.id;
         return (
           <div
             key={opt.id}
             className={`option-row ${isSelected || opt.highlighted ? "highlighted" : ""}`}
-            onClick={() => select(opt)}
+            onClick={() => select(opt, index)}
           >
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div className="radio" />

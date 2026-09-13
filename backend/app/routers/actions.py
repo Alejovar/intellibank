@@ -4,6 +4,7 @@ from ..database import get_db
 from ..schemas.chat import ActionExecuteRequest, ChatResponse, SaveScreenRequest
 from .. import auth as auth_module
 from ..llm.orchestrator import run_action_result
+from ..llm.tool_names import normalize_tool_name
 from ..models import SavedScreen, SessionState
 
 router = APIRouter(prefix="/actions", tags=["actions"])
@@ -28,7 +29,8 @@ def _screen_actions(payload: dict | None) -> list[dict]:
     return [action for action in actions if isinstance(action, dict)]
 
 
-def _validate_action(db: Session, user_id: int, body: ActionExecuteRequest) -> None:
+def _validate_action(db: Session, user_id: int, body: ActionExecuteRequest) -> str:
+    tool = normalize_tool_name(body.tool)
     state = db.get(SessionState, user_id)
     if state is None:
         raise HTTPException(
@@ -41,7 +43,7 @@ def _validate_action(db: Session, user_id: int, body: ActionExecuteRequest) -> N
     matches = [
         action
         for action in _screen_actions(state.last_screen_payload)
-        if action.get("tool") == body.tool
+        if normalize_tool_name(action.get("tool") or "") == tool
     ]
     if not matches:
         raise HTTPException(
@@ -49,22 +51,27 @@ def _validate_action(db: Session, user_id: int, body: ActionExecuteRequest) -> N
             detail="esa accion no esta disponible en la pantalla actual",
         )
 
-    requires_confirmation = body.tool in SENSITIVE_TOOLS or any(
+    requires_confirmation = tool in SENSITIVE_TOOLS or any(
         action.get("requires_confirmation") or action.get("requires_biometric")
         for action in matches
     )
     pending = state.pending_action if isinstance(state.pending_action, dict) else {}
-    pending_tools = pending.get("tools") or []
+    pending_tools = {
+        normalize_tool_name(pending_tool)
+        for pending_tool in pending.get("tools") or []
+        if isinstance(pending_tool, str)
+    }
     confirmed = (
         state.current_stage == "confirmation"
         and pending.get("screen_id") == body.screen_id
-        and body.tool in pending_tools
+        and tool in pending_tools
     )
     if requires_confirmation and not confirmed:
         raise HTTPException(
             status_code=403,
             detail="esta accion requiere pasar primero por una confirmacion",
         )
+    return tool
 
 
 @router.post("/execute", response_model=ChatResponse)
@@ -78,13 +85,13 @@ def execute_action(
     pantalla generada. Nunca se manda como un mensaje de chat nuevo: se
     ejecuta como tool call real contra el backend (regla #4 del hackathon).
     """
-    _validate_action(db, user.id, body)
+    tool = _validate_action(db, user.id, body)
     response = run_action_result(
         db=db,
         user_id=user.id,
         user_full_name=user.full_name,
         active_categories=[],
-        tool=body.tool,
+        tool=tool,
         args=body.args,
     )
     return ChatResponse(response=response)

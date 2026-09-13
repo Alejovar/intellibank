@@ -125,7 +125,7 @@ class BackendHardeningTest(unittest.TestCase):
                     "component": "ConfirmationSummary",
                     "actions": [
                         {
-                            "tool": "apply_credit_plan",
+                            "tool": "functions.apply_credit_plan",
                             "args": action_args,
                             "requires_biometric": True,
                         }
@@ -154,7 +154,7 @@ class BackendHardeningTest(unittest.TestCase):
             "components": [{"id": "success", "component": "SuccessScreen"}],
         }
         request = ActionExecuteRequest(
-            tool="apply_credit_plan",
+            tool="functions.apply_credit_plan",
             args=action_args,
             screen_id="confirmar-plan",
         )
@@ -215,8 +215,9 @@ db.close()
             last_screen_id="actual",
             last_screen_payload={
                 "id": "actual",
+                "stage_kind": "confirmation",
                 "components": [{
-                    "actions": [{"tool": "apply_credit_plan"}],
+                    "actions": [{"tool": "functions.apply_credit_plan"}],
                 }],
                 "footer_actions": [],
             },
@@ -239,13 +240,14 @@ db.close()
             )
         self.assertEqual(unoffered.exception.status_code, 403)
 
-        with self.assertRaises(HTTPException) as unconfirmed:
-            execute_action(
-                ActionExecuteRequest(tool="apply_credit_plan", screen_id="actual"),
-                self.db,
-                self.user,
-            )
-        self.assertEqual(unconfirmed.exception.status_code, 403)
+        for tool in ("functions.apply_credit_plan", "apply_credit_plan"):
+            with self.subTest(tool=tool), self.assertRaises(HTTPException) as unconfirmed:
+                execute_action(
+                    ActionExecuteRequest(tool=tool, screen_id="actual"),
+                    self.db,
+                    self.user,
+                )
+            self.assertEqual(unconfirmed.exception.status_code, 403)
 
     def test_illegal_llm_stage_transition_returns_fallback(self):
         # "intent" (pedir aclaracion) es un destino valido desde cualquier

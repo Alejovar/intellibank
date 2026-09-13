@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from .client import get_client, get_model
 from . import mcp_client
 from .system_prompt import build_system_prompt
+from .tool_names import normalize_tool_name
 from .tool_specs import OPENAI_TOOLS
 from ..models import ConversationTurn, InterfaceHistory, SessionState
 from ..schemas.a2ui import A2UIScreen, A2UIClarification, A2UIEnvelope
@@ -23,10 +24,6 @@ from ..schemas.chat import ChatTextResponse
 logger = logging.getLogger("banorte.orchestrator")
 
 MAX_TOOL_ITERATIONS = 6
-
-
-def _normalize_tool_name(name: str) -> str:
-    return name.removeprefix("functions.")
 
 
 ALLOWED_STAGE_TRANSITIONS = {
@@ -121,7 +118,9 @@ def reset_history(db: Session, user_id: int) -> None:
 
 
 def _run_domain_tool(db: Session, user_id: int, name: str, tool_input: dict) -> dict:
-    return mcp_client.call_domain_tool(name, user_id, tool_input)
+    return mcp_client.call_domain_tool(
+        normalize_tool_name(name), user_id, tool_input
+    )
 
 
 def _build_ui_response(name: str, tool_input: dict) -> A2UIEnvelope | None:
@@ -207,7 +206,7 @@ def _accept_ui_transition(
             for action in component.actions
         ] + payload.footer_actions
         tools = sorted({
-            action.tool
+            normalize_tool_name(action.tool)
             for action in actions
             if action.requires_confirmation or action.requires_biometric
         })
@@ -252,7 +251,7 @@ def run_turn(
         message = response.choices[0].message
         tool_calls = message.tool_calls or []
         normalized_tool_calls = [
-            (tc, _normalize_tool_name(tc.function.name)) for tc in tool_calls
+            (tc, normalize_tool_name(tc.function.name)) for tc in tool_calls
         ]
 
         # Guardamos la respuesta del asistente con nombres de tools normalizados.
