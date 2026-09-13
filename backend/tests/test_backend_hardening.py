@@ -14,7 +14,7 @@ from sqlalchemy.orm import sessionmaker
 from app.database import Base
 from app import auth as auth_module
 from app.llm import mcp_client
-from app.llm.orchestrator import reset_history, run_turn
+from app.llm.orchestrator import _accept_ui_transition, reset_history, run_turn
 from app.llm.tools import TOOL_REGISTRY
 from app.models import (
     Account,
@@ -29,6 +29,7 @@ from app.models import (
 from app.routers.actions import execute_action
 from app.routers.investments import replay_history_item
 from app.schemas.chat import ActionExecuteRequest, HistoryReplayRequest
+from app.schemas.a2ui import A2UIEnvelope, A2UIScreen
 
 
 def _tool_call(call_id, name, arguments):
@@ -433,6 +434,73 @@ db.close()
         self.assertEqual(state.current_stage, "intent")
         self.assertEqual(state.last_screen_id, "fallback-clarify")
         self.assertIsNone(state.pending_action)
+
+    def test_sensitive_action_on_non_confirmation_screen_returns_fallback(self):
+        generated_screen = {
+            "id": "inversion-invalida",
+            "title": "Invierte ahora",
+            "stage_kind": "generated",
+            "stage_label": "Inversion",
+            "components": [
+                {
+                    "id": "investment",
+                    "component": "InvestmentProductList",
+                    "actions": [
+                        {
+                            "tool": "functions.confirm_investment",
+                            "args": {"product_id": "fondo-1", "amount": 1000},
+                            "requires_biometric": True,
+                        }
+                    ],
+                }
+            ],
+        }
+        with patch(
+            "app.llm.orchestrator.get_client",
+            return_value=_FakeClient([
+                _response(_tool_call("ui-sensitive", "emit_screen", generated_screen))
+            ]),
+        ):
+            response = run_turn(
+                self.db, self.user_id, self.user.full_name, [], "quiero invertir"
+            )
+
+        self.assertEqual(response.payload.id, "fallback-clarify")
+        state = self.db.get(SessionState, self.user_id)
+        self.assertEqual(state.current_stage, "intent")
+        self.assertEqual(state.last_screen_id, "fallback-clarify")
+        self.assertIsNone(state.pending_action)
+
+    def test_sensitive_action_on_confirmation_screen_is_accepted(self):
+        self.db.add(SessionState(
+            user_id=self.user_id,
+            current_stage="generated",
+            last_screen_id="simulacion",
+        ))
+        self.db.commit()
+        envelope = A2UIEnvelope(payload=A2UIScreen(
+            id="confirmar-inversion",
+            title="Confirma tu inversion",
+            stage_kind="confirmation",
+            stage_label="Confirmacion",
+            components=[{
+                "id": "summary",
+                "component": "ConfirmationSummary",
+                "actions": [{
+                    "tool": "functions.confirm_investment",
+                    "args": {"product_id": "fondo-1", "amount": 1000},
+                    "requires_biometric": True,
+                }],
+            }],
+        ))
+
+        self.assertTrue(_accept_ui_transition(self.db, self.user_id, envelope))
+        state = self.db.get(SessionState, self.user_id)
+        self.assertEqual(state.current_stage, "confirmation")
+        self.assertEqual(
+            state.pending_action,
+            {"screen_id": "confirmar-inversion", "tools": ["confirm_investment"]},
+        )
 
     def test_reset_removes_history_and_fsm_state(self):
         self.db.add(ConversationTurn(

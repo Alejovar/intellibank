@@ -4,21 +4,10 @@ from ..database import get_db
 from ..schemas.chat import ActionExecuteRequest, ChatResponse, SaveScreenRequest
 from .. import auth as auth_module
 from ..llm.orchestrator import run_action_result
-from ..llm.tool_names import normalize_tool_name
+from ..llm.tool_names import SENSITIVE_TOOLS, normalize_tool_name
 from ..models import SavedScreen, SessionState
 
 router = APIRouter(prefix="/actions", tags=["actions"])
-
-SENSITIVE_TOOLS = {
-    "apply_credit_plan",
-    "confirm_investment",
-    "schedule_payment",
-    "confirm_insurance_policy",
-    "file_insurance_claim",
-    "contribute_to_goal",
-    "execute_transfer",
-}
-
 
 def _screen_actions(payload: dict | None) -> list[dict]:
     if not isinstance(payload, dict):

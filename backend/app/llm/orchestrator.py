@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from .client import get_client, get_model
 from . import mcp_client
 from .system_prompt import build_system_prompt
-from .tool_names import normalize_tool_name
+from .tool_names import SENSITIVE_TOOLS, normalize_tool_name
 from .tool_specs import OPENAI_TOOLS
 from ..models import ConversationTurn, InterfaceHistory, SessionState
 from ..schemas.a2ui import A2UIScreen, A2UIClarification, A2UIEnvelope
@@ -188,6 +188,24 @@ def _accept_ui_transition(
             new_stage,
         )
         return False
+
+    if isinstance(payload, A2UIScreen) and new_stage != "confirmation":
+        actions = [
+            action
+            for component in payload.components
+            for action in component.actions
+        ] + payload.footer_actions
+        for action in actions:
+            tool = normalize_tool_name(action.tool)
+            if tool in SENSITIVE_TOOLS:
+                logger.warning(
+                    "Pantalla rechazada para usuario %s: tool sensible '%s' fuera "
+                    "de una etapa de confirmacion (stage_kind=%s)",
+                    user_id,
+                    tool,
+                    new_stage,
+                )
+                return False
 
     if state is None:
         state = SessionState(user_id=user_id)
