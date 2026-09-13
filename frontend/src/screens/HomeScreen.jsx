@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { api } from "../api/client";
 import BottomNav from "../components/BottomNav";
 import ChatInput from "../components/ChatInput";
@@ -12,11 +12,70 @@ const money = new Intl.NumberFormat("es-MX", {
 });
 
 const HOME_ACTIONS = [
-  { key: "transfer", label: "Transferir" },
-  { key: "card", label: "Prender / apagar tarjeta" },
-  { key: "withdraw", label: "Retiro sin tarjeta" },
-  { key: "statement", label: "Estado de cuenta" },
+  { key: "transfer", icon: "transfer", label: "Transferir" },
+  { key: "card", icon: "card", label: "Prender / apagar tarjeta" },
+  { key: "withdraw", icon: "withdraw", label: "Retiro sin tarjeta" },
+  { key: "statement", icon: "statement", label: "Estado de cuenta" },
 ];
+
+const CATEGORY_ACTIONS = {
+  "Banca personal": [
+    { key: "personal-movements", icon: "statement", label: "Ver mis movimientos", subtopics: ["Movimientos"] },
+    { key: "personal-expenses", icon: "statement", label: "Controlar mis gastos", subtopics: ["Control de gasto"] },
+    { key: "personal-accounts", icon: "card", label: "Consultar mis cuentas", subtopics: ["Mis cuentas"] },
+  ],
+  Inversiones: [
+    { key: "investments-portfolio", icon: "statement", label: "Ver mi portafolio", subtopics: ["Portafolios", "Perfilamiento", "Metas"] },
+    { key: "investments-fund", icon: "statement", label: "Cotizar un fondo", subtopics: ["Fondos", "Liquidez", "Renta fija", "Deuda", "Renta variable", "Notas estructuradas"] },
+    { key: "investments-market", icon: "transfer", label: "Explorar mercados y divisas", subtopics: ["Mercado", "Divisas", "Simulación"] },
+  ],
+  Crédito: [
+    { key: "credit-card", icon: "card", label: "Revisar mi tarjeta", subtopics: ["Precalificación"] },
+    { key: "credit-debt", icon: "statement", label: "Reestructurar mi deuda", subtopics: ["Refinanciamiento"] },
+    { key: "credit-payments", icon: "statement", label: "Simular una amortización", subtopics: ["Amortización"] },
+  ],
+  Pagos: [
+    { key: "payments-transfer", icon: "transfer", label: "Transferir dinero", subtopics: ["Transferencias"] },
+    { key: "payments-schedule", icon: "statement", label: "Programar un pago", subtopics: ["Cobros"] },
+    { key: "payments-reconcile", icon: "statement", label: "Revisar pagos y cobros", subtopics: ["Conciliación"] },
+  ],
+  Seguros: [
+    { key: "insurance-quote", icon: "statement", label: "Cotizar un seguro", subtopics: ["Cotización"] },
+    { key: "insurance-claim", icon: "statement", label: "Reportar un siniestro", subtopics: ["Siniestros"] },
+    { key: "insurance-coverage", icon: "statement", label: "Revisar mis coberturas", subtopics: ["Coberturas"] },
+  ],
+  "Educación financiera": [
+    { key: "education-diagnosis", icon: "statement", label: "Ver mi diagnóstico financiero", subtopics: ["Diagnóstico"] },
+    { key: "education-goals", icon: "statement", label: "Definir una meta de ahorro", subtopics: ["Metas"] },
+    { key: "education-habits", icon: "statement", label: "Mejorar mis hábitos financieros", subtopics: ["Hábitos"] },
+  ],
+};
+
+const getPersonalizedActions = (categories, subtopicsByCategory) => {
+  const rankedGroups = categories
+    .map((category) => {
+      const actions = CATEGORY_ACTIONS[category];
+      if (!actions) return null;
+      const selectedSubtopics = subtopicsByCategory[category] || [];
+      return [...actions].sort((left, right) => {
+        const leftMatches = left.subtopics.some((subtopic) => selectedSubtopics.includes(subtopic));
+        const rightMatches = right.subtopics.some((subtopic) => selectedSubtopics.includes(subtopic));
+        return Number(rightMatches) - Number(leftMatches);
+      });
+    })
+    .filter(Boolean);
+
+  if (rankedGroups.length === 0) return HOME_ACTIONS;
+
+  const suggestions = [];
+  for (let actionIndex = 0; actionIndex < 3 && suggestions.length < 4; actionIndex += 1) {
+    for (const group of rankedGroups) {
+      if (group[actionIndex]) suggestions.push(group[actionIndex]);
+      if (suggestions.length === 4) break;
+    }
+  }
+  return suggestions;
+};
 
 function ActionIcon({ type }) {
   if (type === "transfer") {
@@ -33,6 +92,8 @@ function ActionIcon({ type }) {
 
 export default function HomeScreen({ onNavigate, onStartAssistant }) {
   const storedName = useAppStore((s) => s.fullName);
+  const activeCategories = useAppStore((s) => s.activeCategories);
+  const activeSubtopics = useAppStore((s) => s.activeSubtopics);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(null);
 
@@ -44,6 +105,10 @@ export default function HomeScreen({ onNavigate, onStartAssistant }) {
   const investments = summary?.investmentStats;
   const firstName = (summary?.user?.fullName || storedName || "Cliente").split(" ")[0];
   const investmentYield = investments?.gainPct ?? 0;
+  const homeActions = useMemo(
+    () => getPersonalizedActions(activeCategories, activeSubtopics),
+    [activeCategories, activeSubtopics]
+  );
 
   return (
     <div className="phone-shell">
@@ -91,15 +156,20 @@ export default function HomeScreen({ onNavigate, onStartAssistant }) {
 
         <section className="home-start">
           <div className="section-label">Empieza por aquí</div>
-          <div className="home-actions">
-            {HOME_ACTIONS.map((action) => (
-              <div className="home-action" key={action.key}>
+          <div className="home-actions" style={{ "--home-action-count": homeActions.length }}>
+            {homeActions.map((action) => (
+              <button
+                type="button"
+                className="home-action"
+                key={action.key}
+                onClick={() => onStartAssistant(action.label)}
+              >
                 <span className="home-action-main">
-                  <span className="home-action-icon" aria-hidden="true"><ActionIcon type={action.key} /></span>
+                  <span className="home-action-icon" aria-hidden="true"><ActionIcon type={action.icon} /></span>
                   <strong>{action.label}</strong>
                 </span>
                 <span className="home-action-arrow" aria-hidden="true">›</span>
-              </div>
+              </button>
             ))}
           </div>
         </section>

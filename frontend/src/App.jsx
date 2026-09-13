@@ -6,10 +6,13 @@ import AssistantScreen from "./screens/AssistantScreen";
 import HomeScreen from "./screens/HomeScreen";
 import SavedScreensScreen from "./screens/SavedScreensScreen";
 import MoreScreen from "./screens/MoreScreen";
+import ThemeSelectionScreen from "./screens/ThemeSelectionScreen";
 
 export default function App() {
   const token = useAppStore((s) => s.token);
   const onboardingDone = useAppStore((s) => s.onboardingDone);
+  const topicsOnboarded = useAppStore((s) => s.topicsOnboarded);
+  const completeTopicsOnboarding = useAppStore((s) => s.completeTopicsOnboarding);
   const [page, setPage] = useState("home");
   const [initialMessage, setInitialMessage] = useState(null);
 
@@ -22,9 +25,29 @@ export default function App() {
     setPage("assistant");
   };
 
+  const finishTopics = (nextPage = "home") => {
+    completeTopicsOnboarding();
+    setPage(nextPage);
+  };
+
+  const startFromThemeInput = (message) => {
+    completeTopicsOnboarding();
+    openAssistant(message);
+  };
+
   let screen;
   if (!token) screen = <LoginScreen />;
   else if (!onboardingDone) screen = <OnboardingScreen />;
+  else if (!topicsOnboarded) {
+    screen = (
+      <ThemeSelectionScreen
+        onContinue={() => finishTopics("home")}
+        onSkip={() => finishTopics("home")}
+        onFreeInput={startFromThemeInput}
+        onNavigate={(nextPage) => finishTopics(nextPage)}
+      />
+    );
+  }
   else if (page === "home") {
     screen = <HomeScreen onNavigate={setPage} onStartAssistant={openAssistant} />;
   } else if (page === "saved") {

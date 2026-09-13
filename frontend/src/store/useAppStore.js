@@ -9,6 +9,26 @@ const getSavedCategories = () => {
   }
 };
 
+const getSavedSubtopics = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem("banorte_assistant_subtopics") || "{}");
+    if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
+    return Object.fromEntries(
+      Object.entries(saved).filter(([, subtopics]) => Array.isArray(subtopics))
+    );
+  } catch {
+    return {};
+  }
+};
+
+const savedCategories = getSavedCategories();
+const savedTopicsOnboarded =
+  localStorage.getItem("banorte_topics_onboarded") === "1"
+  || savedCategories.length > 0;
+
+// Migracion para quienes ya eligieron temas antes de existir este paso.
+if (savedTopicsOnboarded) localStorage.setItem("banorte_topics_onboarded", "1");
+
 /**
  * Estado global minimo de la app. Guardamos:
  * - sesion (token/nombre)
@@ -21,8 +41,10 @@ export const useAppStore = create((set, get) => ({
   token: localStorage.getItem("banorte_token") || null,
   fullName: localStorage.getItem("banorte_name") || "",
   onboardingDone: localStorage.getItem("banorte_onboarding") === "1",
+  topicsOnboarded: savedTopicsOnboarded,
 
-  activeCategories: getSavedCategories(),
+  activeCategories: savedCategories,
+  activeSubtopics: getSavedSubtopics(),
   thread: [], // [{kind:"chat", role, text} | {kind:"screen", envelope}]
   currentScreen: null, // la ultima A2UIScreen/Clarification mostrada a pantalla completa
   loading: false,
@@ -56,13 +78,31 @@ export const useAppStore = create((set, get) => ({
     set({ onboardingDone: true });
   },
 
+  completeTopicsOnboarding: () => {
+    localStorage.setItem("banorte_topics_onboarded", "1");
+    set({ topicsOnboarded: true });
+  },
+
   toggleCategory: (cat) => {
     const current = get().activeCategories;
-    const activeCategories = current.includes(cat)
-      ? current.filter((c) => c !== cat)
-      : [...current, cat];
+    const removing = current.includes(cat);
+    const activeCategories = removing ? current.filter((c) => c !== cat) : [...current, cat];
+    const activeSubtopics = { ...get().activeSubtopics };
+    if (removing) delete activeSubtopics[cat];
     localStorage.setItem("banorte_assistant_topics", JSON.stringify(activeCategories));
-    set({ activeCategories });
+    localStorage.setItem("banorte_assistant_subtopics", JSON.stringify(activeSubtopics));
+    set({ activeCategories, activeSubtopics });
+  },
+
+  toggleSubtopic: (category, subtopic) => {
+    const activeSubtopics = { ...get().activeSubtopics };
+    const current = activeSubtopics[category] || [];
+    activeSubtopics[category] = current.includes(subtopic)
+      ? current.filter((item) => item !== subtopic)
+      : [...current, subtopic];
+    if (activeSubtopics[category].length === 0) delete activeSubtopics[category];
+    localStorage.setItem("banorte_assistant_subtopics", JSON.stringify(activeSubtopics));
+    set({ activeSubtopics });
   },
 
   setLoading: (v) => set({ loading: v }),
