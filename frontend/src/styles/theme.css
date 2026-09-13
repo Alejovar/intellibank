@@ -437,3 +437,13 @@ button { -webkit-appearance: none; }
   .phone-shell { width:420px;height:900px;min-height:900px;max-height:900px;border:9px solid #141012;border-radius:46px;box-shadow:0 40px 80px -30px rgba(60,10,20,.45),0 0 0 1px rgba(0,0,0,.25); }
 }
 @media (max-width:469px) { .phone-shell { width:100%;max-height:none; } }
+
+/* App nativa (Android/Capacitor): siempre a pantalla completa y adaptable,
+   sin el marco de "celular" que se usa para la demo en navegador de
+   escritorio. Gana por especificidad sobre las reglas de arriba, sin
+   importar el ancho de viewport (laptop, tablet o celular). */
+body.native-app { padding:0; }
+body.native-app .phone-shell {
+  width:100%;max-width:none;height:100dvh;min-height:100dvh;max-height:none;
+  margin:0;border:none;border-radius:0;box-shadow:none;
+}

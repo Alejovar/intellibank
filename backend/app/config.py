@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     openai_transcription_model: str = "gpt-4o-mini-transcribe"
     database_url: str = "sqlite:///./banorte_demo.db"
     jwt_secret: str = "dev-secret-change-me"
-    cors_origins: str = "http://localhost:5173"
+    # http://localhost es el origin del WebView de la app Android empacada
+    # con Capacitor (server.androidScheme en capacitor.config.json).
+    cors_origins: str = "http://localhost:5173,http://localhost"
     webauthn_rp_id: str = "localhost"
     webauthn_rp_name: str = "Banorte"
     webauthn_origin: str = "http://localhost:5173"

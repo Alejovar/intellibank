@@ -1,10 +1,13 @@
 import { useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { SpeechRecognition as NativeSpeechRecognition } from "@capacitor-community/speech-recognition";
 import { api } from "../api/client";
 
 /**
  * Input siempre disponible debajo de la pantalla: texto + microfono.
- * Usa la Web Speech API cuando esta disponible (Chrome/Edge); si no,
- * graba el audio y recurre a la transcripcion del backend.
+ * En Android nativo usa el plugin de Capacitor (el WebView no trae Web
+ * Speech API). En navegador usa Web Speech API cuando esta disponible;
+ * si no, graba el audio y recurre a la transcripcion del backend.
  */
 export default function ChatInput({ onSend, disabled, navigation }) {
   const [text, setText] = useState("");
@@ -13,10 +16,39 @@ export default function ChatInput({ onSend, disabled, navigation }) {
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
 
+  const isNative = Capacitor.isNativePlatform();
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   const canRecordAudio = Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder);
+  const voiceSupported = isNative || Boolean(SpeechRecognition) || canRecordAudio;
+
+  const startNativeListening = async () => {
+    try {
+      const permission = await NativeSpeechRecognition.requestPermissions();
+      if (permission.speechRecognition !== "granted") {
+        setListening(false);
+        return;
+      }
+      setListening(true);
+      const { matches } = await NativeSpeechRecognition.start({
+        language: "es-MX",
+        maxResults: 1,
+        prompt: "Habla ahora…",
+        popup: true,
+        partialResults: false,
+      });
+      if (matches?.[0]) onSend(matches[0], "voice");
+    } catch {
+      /* El usuario puede volver a intentar; no interrumpimos el chat. */
+    } finally {
+      setListening(false);
+    }
+  };
 
   const startListening = async () => {
+    if (isNative) {
+      await startNativeListening();
+      return;
+    }
     if (!SpeechRecognition) {
       if (!canRecordAudio) return;
       if (recorderRef.current?.state === "recording") {
@@ -75,9 +107,9 @@ export default function ChatInput({ onSend, disabled, navigation }) {
         <button
           className={`icon-btn ${listening ? "mic-active" : ""}`}
           onClick={startListening}
-          disabled={disabled || (!SpeechRecognition && !canRecordAudio)}
-          title={SpeechRecognition || canRecordAudio ? "Hablar" : "Voz no soportada en este navegador"}
-          aria-label={SpeechRecognition || canRecordAudio ? "Hablar" : "Voz no disponible"}
+          disabled={disabled || !voiceSupported}
+          title={voiceSupported ? "Hablar" : "Voz no soportada en este navegador"}
+          aria-label={voiceSupported ? "Hablar" : "Voz no disponible"}
         >
           <svg className="mic-glyph" viewBox="0 0 24 24" aria-hidden="true">
             <rect x="8" y="2.75" width="8" height="12" rx="4" />

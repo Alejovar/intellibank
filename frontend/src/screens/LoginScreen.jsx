@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
+import { AccessControl, NativeBiometric } from "@capgo/capacitor-native-biometric";
 import { api } from "../api/client";
 import { useAppStore } from "../store/useAppStore";
 import { Brand, StatusBar } from "../components/PhoneChrome";
@@ -11,6 +13,11 @@ import {
 const ACCOUNT_IDENTIFIER = "intellibank_account_identifier";
 const BIOMETRIC_IDENTIFIER = "intellibank_biometric_identifier";
 const HAS_ACCOUNT = "intellibank_has_account";
+const NATIVE_BIOMETRIC_IDENTIFIER = "intellibank_native_biometric_identifier";
+// El WebView de Android no implementa WebAuthn, asi que la huella/rostro
+// nativos usan el plugin de Capacitor en vez de las passkeys de arriba.
+const NATIVE_BIOMETRIC_SERVER = "com.banorte.hackathon";
+const isNative = Capacitor.isNativePlatform();
 
 const onlyDigits = (value, maxLength) => value.replace(/\D/g, "").slice(0, maxLength);
 
@@ -32,6 +39,7 @@ function CredentialMark({ type }) {
 export default function LoginScreen() {
   const savedIdentifier = localStorage.getItem(ACCOUNT_IDENTIFIER) || "";
   const savedBiometricIdentifier = localStorage.getItem(BIOMETRIC_IDENTIFIER) || "";
+  const savedNativeBiometricIdentifier = localStorage.getItem(NATIVE_BIOMETRIC_IDENTIFIER) || "";
   const [mode, setMode] = useState(localStorage.getItem(HAS_ACCOUNT) ? "login" : "register");
   const [identifier, setIdentifier] = useState(savedIdentifier);
   const [password, setPassword] = useState("");
@@ -49,9 +57,19 @@ export default function LoginScreen() {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(null);
+  const [nativeBiometricAvailable, setNativeBiometricAvailable] = useState(null);
   const login = useAppStore((state) => state.login);
 
   useEffect(() => {
+    if (isNative) {
+      // WebAuthn no corre en el WebView de Android: solo nos importa si el
+      // hardware nativo (huella/rostro) esta disponible en este dispositivo.
+      NativeBiometric.isAvailable()
+        .then((result) => setNativeBiometricAvailable(result.isAvailable))
+        .catch(() => setNativeBiometricAvailable(false));
+      setBiometricAvailable(false);
+      return;
+    }
     platformAuthenticatorAvailable()
       .then((available) => {
         setBiometricAvailable(available);
@@ -167,6 +185,56 @@ export default function LoginScreen() {
       await enrollPasskey({ response, accountIdentifier: identifier.trim() });
     } catch (enrollError) {
       setError(enrollError.message);
+      setLoading(false);
+    }
+  };
+
+  const enrollNativeBiometric = async (accountIdentifier, plainPassword) => {
+    try {
+      await NativeBiometric.setCredentials({
+        username: accountIdentifier,
+        password: plainPassword,
+        server: NATIVE_BIOMETRIC_SERVER,
+        accessControl: AccessControl.BIOMETRY_ANY,
+      });
+      localStorage.setItem(NATIVE_BIOMETRIC_IDENTIFIER, accountIdentifier);
+    } catch {
+      /* No bloqueamos el login si falla guardar las credenciales nativas. */
+    }
+  };
+
+  const enrollNativeFromLogin = async () => {
+    if (!identifier.trim() || !password) {
+      setError("Ingresa tu cuenta y contraseña para activar la biometría");
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      const response = await api.login(identifier.trim(), password);
+      await enrollNativeBiometric(identifier.trim(), password);
+      finishLogin(response, identifier.trim());
+    } catch (enrollError) {
+      setError(enrollError.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const nativeBiometricLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const credentials = await NativeBiometric.getSecureCredentials({ server: NATIVE_BIOMETRIC_SERVER });
+      const response = await api.login(credentials.username, credentials.password);
+      finishLogin(response, credentials.username);
+    } catch (nativeError) {
+      setUsePassword(true);
+      const message = String(nativeError?.message || "");
+      setError(message.toLowerCase().includes("cancel")
+        ? "No se completó la biometría. Entra con tu contraseña."
+        : "No se pudo verificar tu identidad biométrica. Entra con tu contraseña.");
+    } finally {
       setLoading(false);
     }
   };
@@ -379,6 +447,16 @@ export default function LoginScreen() {
               Activar biometría con mi contraseña
             </button>
           )}
+          {isNative && nativeBiometricAvailable && savedNativeBiometricIdentifier && (
+            <button type="button" className="access-switch biometric-switch" onClick={nativeBiometricLogin} disabled={loading}>
+              Entrar con huella o rostro
+            </button>
+          )}
+          {isNative && nativeBiometricAvailable && !savedNativeBiometricIdentifier && (
+            <button type="button" className="biometric-enroll-link" onClick={enrollNativeFromLogin} disabled={loading}>
+              Activar huella o rostro con mi contraseña
+            </button>
+          )}
           <button type="button" className="access-switch" onClick={() => switchMode("register")}>Crear una cuenta nueva</button>
           {usePassword && <div className="demo-note">Demo · clave <b>4152</b> / contraseña <b>demo1234</b></div>}
         </form>
@@ -393,9 +471,24 @@ export default function LoginScreen() {
             <p>Usa Face ID, huella o el PIN seguro de este dispositivo para entrar más rápido la próxima vez.</p>
           </div>
           {error && <div className="info-banner warning"><span>!</span><span>{error}</span></div>}
-          <button type="button" className="btn btn-primary login-cta" onClick={() => enrollPasskey(pendingRegistration)} disabled={loading || !biometricAvailable}>
-            {loading ? "Configurando…" : biometricAvailable ? "Activar Face ID o huella" : "Biometría no disponible"}
-          </button>
+          {isNative ? (
+            <button
+              type="button"
+              className="btn btn-primary login-cta"
+              onClick={async () => {
+                setLoading(true);
+                await enrollNativeBiometric(pendingRegistration.accountIdentifier, registration.password);
+                finishLogin(pendingRegistration.response, pendingRegistration.accountIdentifier);
+              }}
+              disabled={loading || !nativeBiometricAvailable}
+            >
+              {loading ? "Configurando…" : nativeBiometricAvailable ? "Activar huella o rostro" : "Biometría no disponible"}
+            </button>
+          ) : (
+            <button type="button" className="btn btn-primary login-cta" onClick={() => enrollPasskey(pendingRegistration)} disabled={loading || !biometricAvailable}>
+              {loading ? "Configurando…" : biometricAvailable ? "Activar Face ID o huella" : "Biometría no disponible"}
+            </button>
+          )}
           <button type="button" className="access-switch" onClick={() => finishLogin(pendingRegistration.response, pendingRegistration.accountIdentifier)} disabled={loading}>
             Ahora no, continuar
           </button>

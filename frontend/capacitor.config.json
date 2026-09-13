@@ -1,0 +1,9 @@
+{
+  "appId": "com.banorte.hackathon",
+  "appName": "Banorte AI",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "http"
+  }
+}

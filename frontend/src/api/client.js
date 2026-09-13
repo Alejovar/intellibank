@@ -1,6 +1,11 @@
+import { Capacitor } from "@capacitor/core";
 import { useAppStore } from "../store/useAppStore";
 
-const BASE = "/api";
+// La app empacada para Android no tiene el proxy de Vite (que en dev quita
+// el prefijo /api antes de reenviar al backend). Con `adb reverse tcp:8000
+// tcp:8000` el dispositivo ve localhost:8000 como si fuera el propio
+// backend, que no usa prefijo /api en sus rutas.
+const BASE = Capacitor.isNativePlatform() ? "http://localhost:8000" : "/api";
 
 function authHeaders() {
   const token = localStorage.getItem("banorte_token");
