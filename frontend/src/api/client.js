@@ -115,5 +115,11 @@ export const api = {
 
   listInterfaceHistory: () => request("/investments/history"),
 
+  replayInterfaceHistory: (historyId, activeCategories = []) =>
+    request(`/investments/history/${historyId}/replay`, {
+      method: "POST",
+      body: JSON.stringify({ active_categories: activeCategories }),
+    }),
+
   getHomeSummary: () => request("/accounts/home-summary"),
 };

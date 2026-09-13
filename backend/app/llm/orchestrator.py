@@ -223,6 +223,9 @@ def run_turn(
     user_full_name: str,
     active_categories: list[str],
     user_message: str | None,
+    record_interface: bool = True,
+    allowed_domain_tools: set[str] | None = None,
+    require_interface: bool = False,
 ) -> ChatTextResponse | A2UIEnvelope:
     """Ejecuta un turno completo: agrega el mensaje del usuario (si hay),
     corre el loop de tool-use hasta que el LLM emita UI o texto plano."""
@@ -234,6 +237,14 @@ def run_turn(
 
     system = build_system_prompt(active_categories, user_full_name)
     client = get_client()
+    available_tools = OPENAI_TOOLS
+    if allowed_domain_tools is not None:
+        available_tools = [
+            spec
+            for spec in OPENAI_TOOLS
+            if normalize_tool_name(spec["function"]["name"])
+            in allowed_domain_tools | {"emit_screen", "emit_clarification"}
+        ]
     requested_prompt = user_message
     turn_tool_names: list[str] = []
     turn_tool_args: dict = {}
@@ -244,8 +255,8 @@ def run_turn(
             model=get_model(),
             max_tokens=2000,
             messages=[{"role": "system", "content": system}, *history],
-            tools=OPENAI_TOOLS,
-            tool_choice="auto",
+            tools=available_tools,
+            tool_choice="required" if require_interface else "auto",
         )
 
         message = response.choices[0].message
@@ -316,15 +327,16 @@ def run_turn(
             _append_history(db, user_id, tool_entry)
             history.append(tool_entry)
             if accepted:
-                _record_interface_history(
-                    db=db,
-                    user_id=user_id,
-                    user_prompt=requested_prompt,
-                    payload=envelope.payload,
-                    tool_names=turn_tool_names,
-                    tool_args=turn_tool_args,
-                    data_snapshot=turn_data_snapshot,
-                )
+                if record_interface:
+                    _record_interface_history(
+                        db=db,
+                        user_id=user_id,
+                        user_prompt=requested_prompt,
+                        payload=envelope.payload,
+                        tool_names=turn_tool_names,
+                        tool_args=turn_tool_args,
+                        data_snapshot=turn_data_snapshot,
+                    )
                 return envelope
             fallback = _fallback_envelope("validacion o transicion fallida")
             _force_fallback_state(db, user_id, fallback)
@@ -334,6 +346,10 @@ def run_turn(
         # seguimos el loop para que el modelo decida el siguiente paso
         # (normalmente emit_screen).
 
+    if require_interface:
+        fallback = _fallback_envelope("no se genero interfaz durante la reproduccion")
+        _force_fallback_state(db, user_id, fallback)
+        return fallback
     return ChatTextResponse(
         payload="Estoy teniendo problemas para armar esa pantalla, ¿puedes reformular tu pregunta?"
     )
