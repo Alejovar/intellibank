@@ -4,6 +4,47 @@ Hackathon Banorte x Tec de Monterrey. Backend FastAPI + orquestacion de LLM
 que emite interfaces via el protocolo **A2UI**, y frontend React + Vite que
 resuelve ese JSON contra un catalogo cerrado de componentes.
 
+## El problema que resuelve
+
+Un chatbot bancario tradicional responde con texto plano: "tu plan de 24
+meses tendria un pago de $961.84". Esta app en cambio hace que el modelo
+**construya la pantalla** con la que el usuario decide — sliders, graficas,
+tarjetas comparativas — sin que el LLM escriba una sola linea de HTML/JSX.
+La idea central es separar dos responsabilidades que normalmente se mezclan
+en un chatbot generativo:
+
+1. **Que mostrar y cuando** lo decide el LLM (razona sobre la peticion,
+   llama tools de dominio para obtener datos reales, y elige un componente
+   del catalogo).
+2. **Como se ve y como se comporta** lo decide el codigo (un catalogo
+   cerrado de 11 componentes React ya probados, con su propio CSS, estados y
+   validacion), nunca el modelo.
+
+Esto evita dos fallas tipicas de UI generada por IA: HTML/JSX arbitrario que
+rompe el diseño o introduce vulnerabilidades, y una alucinacion de cifras
+porque el modelo "inventa" un numero en vez de leerlo de la base de datos.
+
+## Demo
+
+| Login | Home | UI generada por el LLM |
+|---|---|---|
+| ![Login](artifacts/screenshots/01-login.jpg) | ![Home](artifacts/screenshots/02-home.jpg) | ![Resumen de gastos generado por IA](artifacts/screenshots/03-generated-ui-expense-summary.jpg) |
+
+| Pantallas guardadas | Perfil y temas |
+|---|---|
+| ![Guardadas](artifacts/screenshots/04-saved-screens.jpg) | ![Perfil y temas](artifacts/screenshots/05-profile-topics.jpg) |
+
+Video del flujo completo (intención → UI generada → interacción →
+confirmación → acción real):
+
+<video src="artifacts/intellibank-demo-narrado.mp4" controls width="360"></video>
+
+> Si tu visor de Markdown no reproduce el `<video>` embebido (por ejemplo al
+> ver este archivo fuera de GitHub), descarga o abre directamente
+> [`artifacts/intellibank-demo-narrado.mp4`](artifacts/intellibank-demo-narrado.mp4)
+> (version narrada) o [`artifacts/intellibank-demo.mp4`](artifacts/intellibank-demo.mp4)
+> (version muda).
+
 ## Maquina de estados del flujo
 
 Cada pantalla que el LLM emite (`emit_screen` / `emit_clarification`) trae
